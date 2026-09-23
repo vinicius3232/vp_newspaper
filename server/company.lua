@@ -77,6 +77,13 @@ RegisterNetEvent('databaseupdate', function(actionType, amount)
         return
     end
 
+    -- 3. Autorização de Equipe (Apenas funcionários da redação podem acessar operações financeiras)
+    local isStaff = Security.IsAuthorized(src, Config.General.jobName, 0, true)
+    if not isStaff then
+        NotifyPlayer(src, 'Acesso restrito a funcionários da Weazel News.', 'error')
+        return
+    end
+
     amount = tonumber(amount) or 0
 
     -- ======================================================
@@ -212,6 +219,12 @@ RegisterNetEvent('nproblem_newspaper_iseal', function(targetId)
         return
     end
 
+    local okDist = Security.ValidateDistance(src, Config.General.Coords.managementCoord, 'MANAGEMENT')
+    if not okDist then
+        NotifyPlayer(src, 'Você precisa estar no escritório da redação.', 'error')
+        return
+    end
+
     local targetPlayer = GetPlayer(targetId)
     if not targetPlayer then
         NotifyPlayer(src, 'Cidadão não encontrado.', 'error')
@@ -253,6 +266,12 @@ RegisterNetEvent('nproblem_newspaper_fireupdown', function(workerCid, actionType
     local isBoss = Security.IsAuthorized(src, Config.General.jobName, Config.General.jobBossGrade, true)
     if not isBoss then
         NotifyPlayer(src, 'Apenas diretores podem gerenciar o quadro de funcionários!', 'error')
+        return
+    end
+
+    local okDist = Security.ValidateDistance(src, Config.General.Coords.managementCoord, 'MANAGEMENT')
+    if not okDist then
+        NotifyPlayer(src, 'Você precisa estar no escritório da redação.', 'error')
         return
     end
 

@@ -136,10 +136,38 @@ RegisterNetEvent('clen:saveTexts', function(cbData, pageNum, expectedRevision)
         return
     end
 
-    if not cbData or not pageNum then return end
+    -- 4. Validação de Sessão do Editor Ativa e Não Expirada
+    if not ActiveEditorSession or ActiveEditorSession.src ~= src then
+        NotifyPlayer(src, 'Nenhuma sessão ativa de edição vinculada.', 'error')
+        return
+    end
+
+    if os.time() > ActiveEditorSession.expiresAt then
+        NotifyPlayer(src, 'Sua sessão de edição expirou por inatividade.', 'error')
+        return
+    end
+
+    -- 5. Validação de Página (Bounds Check)
+    pageNum = tonumber(pageNum)
+    local maxPages = Config.General.allowedMaxPage or 5
+    if not pageNum or pageNum < 1 or pageNum > maxPages then
+        NotifyPlayer(src, ('Número de página inválido (1-%d).'):format(maxPages), 'error')
+        return
+    end
+
+    -- 6. Validação de Schema e Tamanho de Payload
+    if type(cbData) ~= 'table' then
+        NotifyPlayer(src, 'Formato de conteúdo inválido.', 'error')
+        return
+    end
+
+    local generalJson = json.encode(cbData)
+    if not generalJson or #generalJson > 65535 then
+        NotifyPlayer(src, 'O conteúdo da página excede o limite de tamanho permitido.', 'error')
+        return
+    end
 
     local pageKey = 'page' .. tostring(pageNum)
-    local generalJson = json.encode(cbData)
     expectedRevision = tonumber(expectedRevision)
 
     -- OCC Update: só grava se a revisão bater com a carregada pelo editor
