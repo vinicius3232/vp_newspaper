@@ -69,25 +69,23 @@ RegisterNUICallback('exit', function(data, cb)
     cb('ok')
 end)
 
-RegisterNUICallback('exit2', function(data, cb)
-    SetNuiFocus(false, false)
-    isNewspaperOpen = false
-    ClearPedTasks(PlayerPedId())
-    TriggerServerEvent('nproblem_newspaper_isEditorActive2')
-    cb('ok')
-end)
-
-RegisterNUICallback('rybuterol_NUICallback_SayfaDegis', function(data, cb)
+local function HandlePageChange(data, cb)
     if data and data.page then
         TriggerServerEvent('changePage', data.page)
     end
     cb('ok')
-end)
+end
 
-RegisterNUICallback('rybuterol_NUICallback_notify', function(data, cb)
+local function HandleNotify(data, cb)
     if data and data.notify then
         local msg = _U(data.notify) or data.notify
         TriggerEvent('vp_newspaper:client:notify', msg, 'info')
     end
     cb('ok')
-end)
+end
+
+RegisterNUICallback('changePage', HandlePageChange)
+RegisterNUICallback('rybuterol_NUICallback_SayfaDegis', HandlePageChange)
+
+RegisterNUICallback('notify', HandleNotify)
+RegisterNUICallback('rybuterol_NUICallback_notify', HandleNotify)

@@ -94,6 +94,7 @@ CreateThread(function()
                 icon = 'fas fa-boxes-stacked',
                 label = _U('restock_box'),
                 distance = 2.0,
+                groups = Config.General.jobName,
                 onSelect = function(data)
                     local pCoords = GetEntityCoords(PlayerPedId())
                     local boxId, box = GetClosestBox(pCoords)

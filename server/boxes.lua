@@ -1,51 +1,27 @@
 -- ==========================================================
--- vp_newspaper: Newspaper Boxes (Dispensers), Buying & Restocking
+-- vp_newspaper: Hardened Newspaper Boxes, Purchase & Restock
 -- ==========================================================
 
 local Boxes = {}
 
----Gera serial UUID v4 para rastreabilidade de jornais
----@return string
-local function GenerateSerial()
-    local template = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
-    return template:gsub('[xy]', function(c)
-        local v = (c == 'x') and math.random(0, 0xf) or math.random(8, 0xb)
-        return string.format('%x', v)
-    end)
-end
-
----Carrega todas as bancas do banco de dados na inicialização
+---Carrega todas as bancas do banco de dados com versionamento CAS
 local function LoadBoxes()
-    MySQL.query('SELECT * FROM `newspaper_boxes`', {}, function(results)
-        if results and #results > 0 then
-            Boxes = {}
-            for _, row in ipairs(results) do
-                local c = json.decode(row.coords)
-                Boxes[row.id] = {
-                    id = row.id,
-                    coords = vector3(c.x, c.y, c.z),
-                    heading = row.heading or 0.0,
-                    stock = row.stock or 15
-                }
-            end
-        else
-            -- Seed padrão inicial
-            Boxes = {}
-            for i, def in ipairs(Config.General.defaultBoxes) do
-                local cJson = json.encode({ x = def.coords.x, y = def.coords.y, z = def.coords.z })
-                MySQL.query('INSERT INTO `newspaper_boxes` (`id`, `coords`, `heading`, `stock`) VALUES (?, ?, ?, ?)', {
-                    def.id, cJson, def.coords.w, def.stock
-                })
-                Boxes[def.id] = {
-                    id = def.id,
-                    coords = vector3(def.coords.x, def.coords.y, def.coords.z),
-                    heading = def.coords.w,
-                    stock = def.stock
-                }
-            end
+    local rows = MySQL.query.await('SELECT `id`, `coords`, `heading`, `stock`, `max_stock`, `version` FROM `newspaper_boxes`', {})
+    Boxes = {}
+    if rows and #rows > 0 then
+        for _, row in ipairs(rows) do
+            local c = json.decode(row.coords)
+            Boxes[row.id] = {
+                id = row.id,
+                coords = vector3(c.x, c.y, c.z),
+                heading = row.heading or 0.0,
+                stock = row.stock or 0,
+                maxStock = row.max_stock or 20,
+                version = row.version or 1,
+            }
         end
-        TriggerClientEvent('vp_newspaper:client:syncBoxes', -1, Boxes)
-    end)
+    end
+    TriggerClientEvent('vp_newspaper:client:syncBoxes', -1, Boxes)
 end
 
 AddEventHandler('onResourceStart', function(res)
@@ -54,204 +30,256 @@ AddEventHandler('onResourceStart', function(res)
     LoadBoxes()
 end)
 
--- Sincronização ao carregar o jogador
 RegisterNetEvent('vp_newspaper:server:requestBoxes', function()
     local src = source
     TriggerClientEvent('vp_newspaper:client:syncBoxes', src, Boxes)
 end)
 
--- Callback legado compatível para buscar bancas
-if QBCore then
-    QBCore.Functions.CreateCallback('nproblem_newspaper_kutularial', function(source, cb)
-        cb(Boxes)
-    end)
-end
-
 -- ==========================================================
--- Compra de Jornal na Banca (Fail-Closed & Anti-Cheat Distance)
+-- Compra de Jornal — Transação Idempotente, Atômica & Anti-Dupe
 -- ==========================================================
 
 RegisterNetEvent('vp_newspaper:server:buyNewspaper', function(boxId)
     local src = source
     local player = GetPlayer(src)
     if not player then return end
+    local cid = player.PlayerData.citizenid
 
-    local box = Boxes[boxId]
-    if not box then return end
-
-    -- Verificação de distância física (OneSync Infinity)
-    local ped = GetPlayerPed(src)
-    local pCoords = GetEntityCoords(ped)
-    if #(pCoords - box.coords) > 4.5 then
-        print(('^1[vp_newspaper] Alerta Anti-Exploit: Jogador %s tentou comprar jornal a %.2fm da banca %s!^7'):format(src, #(pCoords - box.coords), boxId))
+    -- 1. Rate Limit (Tier: ECONOMIC)
+    if not Security.CheckRateLimit(src, 'buy_newspaper', 'ECONOMIC') then
+        NotifyPlayer(src, 'Por favor, aguarde alguns segundos antes de comprar novamente.', 'error')
         return
     end
 
-    -- Verificação de estoque
-    if Config.General.isBoxCheckAvailable and box.stock <= 0 then
+    boxId = tonumber(boxId)
+    local box = Boxes[boxId]
+    if not box then
+        NotifyPlayer(src, 'Banca de jornal não encontrada.', 'error')
+        return
+    end
+
+    -- 2. Checagem Estrita de Distância Física no Servidor (Max 2.5m)
+    local okDist, currentDist = Security.ValidateDistance(src, box.coords, 'STAND')
+    if not okDist then
+        NotifyPlayer(src, 'Você está muito distante da banca de jornal.', 'error')
+        return
+    end
+
+    -- 3. Obtenção do Preço Atual do Jornal
+    local compRow = MySQL.single.await('SELECT `newspaperPrice`, `balance` FROM `newspaper_company` WHERE `id` = 1')
+    local price = compRow and compRow.newspaperPrice or 10
+
+    -- 4. Criação do Registro de Operação Durável (PENDING)
+    local opId = Operations.New('purchase', src, cid, tostring(boxId), price, { boxId = boxId, price = price })
+    Operations.Transition(opId, 'PROCESSING')
+
+    -- 5. Compare-And-Swap (CAS) Atômico no Estoque da Banca (Proteção contra Concorrência)
+    local updateResult = MySQL.query.await([[
+        UPDATE `newspaper_boxes`
+        SET `stock` = `stock` - 1, `version` = `version` + 1
+        WHERE `id` = ? AND `stock` > 0
+    ]], { boxId })
+
+    local affectedRows = updateResult and updateResult.affectedRows or 0
+    if affectedRows == 0 then
+        -- Falha atômica: Estoque acabou ou outro jogador comprou o último exemplar concorrentemente
+        Operations.Transition(opId, 'ABORTED', 'out_of_stock')
         NotifyPlayer(src, _U('noNewspaper'), 'error')
         return
     end
 
-    -- Obter preço atual da empresa
-    GetCompanyData(function(comp)
-        local price = comp.newspaperPrice or 10
-        local pMoney = GetPlayerMoney(src, 'cash')
-        local usedType = 'cash'
-
-        if pMoney < price then
-            pMoney = GetPlayerMoney(src, 'bank')
+    -- 6. Verificação e Débito Financeiro (Fail-Closed)
+    local pCash = GetPlayerMoney(src, 'cash')
+    local usedType = 'cash'
+    if pCash < price then
+        local pBank = GetPlayerMoney(src, 'bank')
+        if pBank >= price then
             usedType = 'bank'
-            if pMoney < price then
-                NotifyPlayer(src, _U('buyNewspaperError'), 'error')
-                return
-            end
-        end
-
-        -- Fail-Closed: Remove dinheiro primeiro
-        if not RemovePlayerMoney(src, usedType, price, 'newspaper_purchase') then
+        else
+            -- Sem fundos suficientes: Estorna o estoque da banca
+            MySQL.query.await('UPDATE `newspaper_boxes` SET `stock` = `stock` + 1 WHERE `id` = ?', { boxId })
+            Operations.Transition(opId, 'ABORTED', 'insufficient_funds')
             NotifyPlayer(src, _U('buyNewspaperError'), 'error')
             return
         end
+    end
 
-        -- Atualiza estoque da banca
-        if Config.General.isBoxCheckAvailable then
-            box.stock = box.stock - 1
-            MySQL.query('UPDATE `newspaper_boxes` SET `stock` = ? WHERE `id` = ?', { box.stock, boxId })
-            TriggerClientEvent('vp_newspaper:client:updateBoxStock', -1, boxId, box.stock)
-        end
+    local debited = RemovePlayerMoney(src, usedType, price, 'newspaper_purchase')
+    if not debited then
+        -- Falha ao remover dinheiro: Estorna o estoque
+        MySQL.query.await('UPDATE `newspaper_boxes` SET `stock` = `stock` + 1 WHERE `id` = ?', { boxId })
+        Operations.Transition(opId, 'ABORTED', 'debit_failed')
+        NotifyPlayer(src, _U('buyNewspaperError'), 'error')
+        return
+    end
 
-        -- Adiciona renda à empresa
-        AddCompanyRevenue(price)
+    -- 7. Geração de Serial Único CSPRNG e Registro no Banco (Anti-Dupe Triplo)
+    local serial = Operations.GenerateUUID()
+    local copyInserted = MySQL.insert.await([[
+        INSERT INTO `vp_newspaper_copies`
+        (`serial`, `owner_cid`, `newspaper_id`, `edition`, `operation_id`, `status`)
+        VALUES (?, ?, 1, 1, ?, 'ACTIVE')
+    ]], { serial, cid, opId })
 
-        -- Adiciona item ao inventário
-        local serial = GenerateSerial()
-        local cid = player.PlayerData.citizenid
+    if not copyInserted then
+        -- Falha ao registrar cópia: Compensação atômica
+        AddPlayerMoney(src, usedType, price, 'newspaper_purchase_refund')
+        MySQL.query.await('UPDATE `newspaper_boxes` SET `stock` = `stock` + 1 WHERE `id` = ?', { boxId })
+        Operations.Transition(opId, 'COMPENSATED', 'serial_insert_failed')
+        NotifyPlayer(src, 'Erro na emissão do jornal. Seu dinheiro foi estornado.', 'error')
+        return
+    end
 
-        if Config.UseOxInventory and GetResourceState('ox_inventory') == 'started' then
-            exports.ox_inventory:AddItem(src, Config.General.newspaperItemName, 1, {
-                serial = serial,
-                date = os.date('%d/%m/%Y'),
-                edition = 1
-            })
-        elseif QBCore then
-            player.Functions.AddItem(Config.General.newspaperItemName, 1, false, {
-                serial = serial,
-                date = os.date('%d/%m/%Y'),
-                edition = 1
-            })
+    -- 8. Entrega do Item no Inventário do Jogador
+    local itemGiven = false
+    if Config.UseOxInventory and GetResourceState('ox_inventory') == 'started' then
+        itemGiven = exports.ox_inventory:AddItem(src, Config.General.newspaperItemName, 1, {
+            serial = serial,
+            date = os.date('%d/%m/%Y'),
+            edition = 1,
+            opId = opId
+        })
+    elseif QBCore then
+        itemGiven = player.Functions.AddItem(Config.General.newspaperItemName, 1, false, {
+            serial = serial,
+            date = os.date('%d/%m/%Y'),
+            edition = 1,
+            opId = opId
+        })
+        if itemGiven then
             TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[Config.General.newspaperItemName], 'add')
         end
+    end
 
-        -- Registra cópia no banco de dados para anti-dupe
-        MySQL.query('INSERT IGNORE INTO `vp_newspaper_copies` (`serial`, `owner_cid`, `newspaper_id`) VALUES (?, ?, ?)', {
-            serial, cid, 1
-        })
+    if not itemGiven then
+        -- Falha ao entregar item (Inventário Cheio): Compensação Completa
+        AddPlayerMoney(src, usedType, price, 'newspaper_refund_inventory_full')
+        MySQL.query.await('UPDATE `newspaper_boxes` SET `stock` = `stock` + 1 WHERE `id` = ?', { boxId })
+        MySQL.query.await('UPDATE `vp_newspaper_copies` SET `status` = \'BURNED\' WHERE `serial` = ?', { serial })
+        Operations.Transition(opId, 'COMPENSATED', 'inventory_full')
+        NotifyPlayer(src, 'Seu inventário está cheio! A compra foi cancelada e o valor estornado.', 'error')
+        return
+    end
 
-        NotifyPlayer(src, _U('buyNewspaperSuccess', price), 'success')
-    end)
+    -- 9. Atualização do Cofre da Empresa e Registro no Ledger Imutável
+    local prevBal = compRow and compRow.balance or 5000
+    local newBal = prevBal + price
+    MySQL.query.await('UPDATE `newspaper_company` SET `balance` = `balance` + ? WHERE `id` = 1', { price })
+    Ledger.Record(opId, cid, 'sale_revenue', price, prevBal, newBal)
+
+    -- 10. Conclusão com Sucesso
+    Operations.Transition(opId, 'COMMITTED')
+
+    -- Atualiza cache local de estoque e sincroniza
+    box.stock = box.stock - 1
+    TriggerClientEvent('vp_newspaper:client:updateBoxStock', -1, boxId, box.stock)
+
+    NotifyPlayer(src, _U('buyNewspaperSuccess', price), 'success')
 end)
 
 -- ==========================================================
--- Reabastecimento da Banca por Entregadores
+-- Reabastecimento de Banca — Crash-Safe, Concorrência & Payout
 -- ==========================================================
 
 RegisterNetEvent('vp_newspaper:server:restockBox', function(boxId)
     local src = source
     local player = GetPlayer(src)
     if not player then return end
+    local cid = player.PlayerData.citizenid
 
+    -- 1. Rate Limit (Tier: ECONOMIC)
+    if not Security.CheckRateLimit(src, 'restock_box', 'ECONOMIC') then
+        NotifyPlayer(src, 'Aguarde alguns instantes antes de reabastecer novamente.', 'error')
+        return
+    end
+
+    boxId = tonumber(boxId)
     local box = Boxes[boxId]
-    if not box then return end
+    if not box then
+        NotifyPlayer(src, 'Banca não encontrada.', 'error')
+        return
+    end
 
-    -- Verificação de distância
-    local ped = GetPlayerPed(src)
-    local pCoords = GetEntityCoords(ped)
-    if #(pCoords - box.coords) > 4.5 then return end
+    -- 2. Autorização: Apenas membros da empresa Weazel News podem reabastecer
+    local isAuth = Security.IsAuthorized(src, Config.General.jobName, 0, true)
+    if not isAuth then
+        NotifyPlayer(src, 'Apenas funcionários da redação podem abastecer as bancas!', 'error')
+        return
+    end
 
-    -- Verificação se já está cheia
-    if box.stock >= Config.General.allowedBoxSpace then
+    -- 3. Checagem de Distância Física no Servidor (Max 2.5m)
+    local okDist = Security.ValidateDistance(src, box.coords, 'STAND')
+    if not okDist then
+        NotifyPlayer(src, 'Você está muito distante da banca.', 'error')
+        return
+    end
+
+    -- 4. Verificação de Capacidade Máxima
+    local currentDbBox = MySQL.single.await('SELECT `stock`, `max_stock`, `version` FROM `newspaper_boxes` WHERE `id` = ?', { boxId })
+    if not currentDbBox or currentDbBox.stock >= currentDbBox.max_stock then
         NotifyPlayer(src, _U('restockFullError'), 'error')
         return
     end
 
-    -- Verificação do item necessário (newspaperbox)
-    local hasItem = false
-    if Config.UseOxInventory and GetResourceState('ox_inventory') == 'started' then
-        local count = exports.ox_inventory:GetItemCount(src, Config.General.restockBoxesItemName)
-        hasItem = (count and count > 0)
-    elseif QBCore then
-        local item = player.Functions.GetItemByName(Config.General.restockBoxesItemName)
-        hasItem = (item and item.amount and item.amount > 0)
-    end
+    -- 5. Criação do Registro de Operação Durável
+    local minR = Config.General.restockPerReward[1] or 35
+    local maxR = Config.General.restockPerReward[2] or 70
+    local reward = math.random(minR, maxR)
 
-    if not hasItem then
-        NotifyPlayer(src, _U('restockNoItemError'), 'error')
-        return
-    end
+    local opId = Operations.New('restock', src, cid, tostring(boxId), reward, { boxId = boxId, reward = reward })
+    Operations.Transition(opId, 'PROCESSING')
 
-    -- Fail-Closed: Remove a caixa de jornais
+    -- 6. Verificação e Remoção da Caixa de Jornais do Inventário (Fail-Closed)
+    local boxItemName = Config.General.restockBoxesItemName
     local removed = false
+
     if Config.UseOxInventory and GetResourceState('ox_inventory') == 'started' then
-        removed = exports.ox_inventory:RemoveItem(src, Config.General.restockBoxesItemName, 1)
+        local count = exports.ox_inventory:GetItemCount(src, boxItemName)
+        if count and count > 0 then
+            removed = exports.ox_inventory:RemoveItem(src, boxItemName, 1)
+        end
     elseif QBCore then
-        removed = player.Functions.RemoveItem(Config.General.restockBoxesItemName, 1)
-        if removed then
-            TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[Config.General.restockBoxesItemName], 'remove')
+        local item = player.Functions.GetItemByName(boxItemName)
+        if item and item.amount and item.amount > 0 then
+            removed = player.Functions.RemoveItem(boxItemName, 1)
+            if removed then
+                TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[boxItemName], 'remove')
+            end
         end
     end
 
     if not removed then
+        Operations.Transition(opId, 'ABORTED', 'no_box_item')
         NotifyPlayer(src, _U('restockNoItemError'), 'error')
         return
     end
 
-    -- Atualiza estoque para o máximo
-    box.stock = Config.General.allowedBoxSpace
-    MySQL.query('UPDATE `newspaper_boxes` SET `stock` = ? WHERE `id` = ?', { box.stock, boxId })
-    TriggerClientEvent('vp_newspaper:client:updateBoxStock', -1, boxId, box.stock)
+    -- 7. CAS Atômico de Atualização de Estoque
+    local updateStock = MySQL.query.await([[
+        UPDATE `newspaper_boxes`
+        SET `stock` = `max_stock`, `version` = `version` + 1
+        WHERE `id` = ? AND `stock` < `max_stock`
+    ]], { boxId })
 
-    -- Recompensa monetária
-    local reward = 0
-    if Config.General.restockReward then
-        local minR = Config.General.restockPerReward[1] or 35
-        local maxR = Config.General.restockPerReward[2] or 70
-        reward = math.random(minR, maxR)
-        AddPlayerMoney(src, 'cash', reward, 'newspaper_restock_delivery')
+    if not updateStock or updateStock.affectedRows == 0 then
+        -- Outro distribuidor encheu a banca concomitantemente: Compensar item
+        if Config.UseOxInventory and GetResourceState('ox_inventory') == 'started' then
+            exports.ox_inventory:AddItem(src, boxItemName, 1)
+        elseif QBCore then
+            player.Functions.AddItem(boxItemName, 1)
+        end
+        Operations.Transition(opId, 'COMPENSATED', 'concurrent_restock_already_full')
+        NotifyPlayer(src, 'Esta banca acabou de ser abastecida por outro entregador! Sua caixa foi devolvida.', 'info')
+        return
     end
+
+    -- 8. Pagamento da Comissão ao Entregador
+    AddPlayerMoney(src, 'cash', reward, 'newspaper_restock_delivery')
+
+    -- 9. Conclusão e Registro no Ledger
+    Operations.Transition(opId, 'COMMITTED')
+    box.stock = currentDbBox.max_stock
+    TriggerClientEvent('vp_newspaper:client:updateBoxStock', -1, boxId, box.stock)
 
     NotifyPlayer(src, _U('restockSuccess', reward), 'success')
 end)
-
--- ==========================================================
--- Comando Staff para Criar Banca Permanente
--- ==========================================================
-
-RegisterCommand(Config.General.creatingBoxes.command, function(source, args)
-    local src = source
-    if src == 0 then return end
-
-    local player = GetPlayer(src)
-    if not player then return end
-
-    local ped = GetPlayerPed(src)
-    local coords = GetEntityCoords(ped)
-    local heading = GetEntityHeading(ped)
-
-    local cJson = json.encode({ x = coords.x, y = coords.y, z = coords.z })
-    MySQL.query('INSERT INTO `newspaper_boxes` (`coords`, `heading`, `stock`) VALUES (?, ?, ?)', {
-        cJson, heading, Config.General.allowedBoxSpace
-    }, function(res)
-        local insertId = res and (res.insertId or res)
-        if insertId then
-            Boxes[insertId] = {
-                id = insertId,
-                coords = coords,
-                heading = heading,
-                stock = Config.General.allowedBoxSpace
-            }
-            TriggerClientEvent('vp_newspaper:client:syncBoxes', -1, Boxes)
-            NotifyPlayer(src, _U('boxCreated'), 'success')
-        end
-    end)
-end, true)

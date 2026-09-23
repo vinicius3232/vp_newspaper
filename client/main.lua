@@ -70,6 +70,7 @@ CreateThread(function()
                 icon = 'fas fa-briefcase',
                 label = 'Painel de Gestão Weazel News',
                 distance = 2.0,
+                groups = Config.General.jobName,
                 onSelect = function()
                     TriggerServerEvent('vp_newspaper:server:requestManagementData')
                 end
@@ -88,6 +89,7 @@ CreateThread(function()
                 icon = 'fas fa-pen-nib',
                 label = 'Computador da Redação (Editar Jornal)',
                 distance = 2.0,
+                groups = Config.General.jobName,
                 onSelect = function()
                     TriggerServerEvent('nproblem_newspaper_back')
                 end
@@ -106,6 +108,7 @@ CreateThread(function()
                 icon = 'fas fa-print',
                 label = 'Imprimir Tiragem de Jornais',
                 distance = 2.0,
+                groups = Config.General.jobName,
                 onSelect = function()
                     if lib.progressBar({
                         duration = 5000,
@@ -133,6 +136,7 @@ CreateThread(function()
                 icon = 'fas fa-scroll',
                 label = 'Pegar Folhas de Papel em Branco',
                 distance = 2.0,
+                groups = Config.General.jobName,
                 onSelect = function()
                     if lib.progressBar({
                         duration = 3000,
@@ -160,6 +164,7 @@ CreateThread(function()
                 icon = 'fas fa-van-shuttle',
                 label = 'Retirar Van de Entrega (Weazel News)',
                 distance = 2.5,
+                groups = Config.General.jobName,
                 onSelect = function()
                     SpawnDeliveryVehicle()
                 end
