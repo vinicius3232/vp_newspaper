@@ -18,8 +18,17 @@ local function RunMigrations()
             -- Divide por ponto e vírgula ignorando linhas vazias
             for statement in string.gmatch(sqlContent, "([^;]+);") do
                 local clean = statement:gsub("^%s+", ""):gsub("%s+$", "")
-                if #clean > 0 and not clean:match("^%-%-") then
-                    MySQL.query.await(clean)
+                -- Remove linhas de comentário SQL (-- ...)
+                local lines = {}
+                for line in clean:gmatch("[^\r\n]+") do
+                    local trimmed = line:gsub("^%s+", "")
+                    if not trimmed:match("^%-%-") then
+                        table.insert(lines, line)
+                    end
+                end
+                local executable = table.concat(lines, "\n"):gsub("^%s+", ""):gsub("%s+$", "")
+                if #executable > 0 then
+                    MySQL.query.await(executable)
                 end
             end
         else

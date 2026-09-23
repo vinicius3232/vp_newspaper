@@ -4,7 +4,7 @@ Recurso profissional, auditado e endurecido de mídia e jornalismo para FiveM, c
 
 ## 🧱 1. Stack Oficial
 * **Framework:** Qbox / QBCore (`exports['qbx_core']` e compatibilidade QBCore)
-* **Inventário:** `ox_inventory` (manipulação atômica de slots, metadata de seriais únicos UUIDv4)
+* **Inventário:** `ox_inventory` (manipulação atômica de slots, serial único UUIDv4 como non-authoritative tracking identifier)
 * **Interação:** `ox_target` (interações nos modelos de bancas, gráfica, redação e cofre)
 * **Utilitários:** `ox_lib` (pontos, zonas, progress bars, callbacks, cache)
 * **Banco de Dados:** `oxmysql` (MariaDB/MySQL com migrations idempotentes e constraints `CHECK`)
@@ -82,14 +82,18 @@ vp_newspaper/
 
 ---
 
-## 🧪 4. Suíte de Testes Automatizada
+## 🧪 4. Suíte de Testes Automatizada & Integração MariaDB
 
-O resource inclui uma suíte de testes de estresse e adversariais em Node.js simulando concorrência real, ataques de injeção e falhas de inventário:
+O resource inclui uma suíte canônica de testes de estresse em Node.js e um gate de integração real contra MariaDB:
 
 ```bash
+# 1. Suíte canônica com SQLite relacional e constraints (97 testes):
 node tests/test_harness.js
+
+# 2. Gate de integração real com MariaDB 12 (10 testes):
+python tests/mariadb_integration_gate.py
 ```
-*Resultado: **20/20 PASS** (Zero falhas).*
+*Resultado: **97/97 PASS** no SQLite e **10/10 PASS** no MariaDB Integration Gate (Zero falhas).*
 
 ---
 
