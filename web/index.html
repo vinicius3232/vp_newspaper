@@ -182,27 +182,6 @@
         </div>
     </div>
 
-    <script>
-        (function() {
-            const resName = window.GetParentResourceName ? window.GetParentResourceName() : 'vp_newspaper';
-            const origOpen = XMLHttpRequest.prototype.open;
-            XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-                if (typeof url === 'string') {
-                    url = url.replace(/https?:\/\/[a-zA-Z0-9_-]+\//g, 'https://' + resName + '/');
-                }
-                return origOpen.call(this, method, url, ...rest);
-            };
-            if (window.fetch) {
-                const origFetch = window.fetch;
-                window.fetch = function(resource, init) {
-                    if (typeof resource === 'string') {
-                        resource = resource.replace(/https?:\/\/[a-zA-Z0-9_-]+\//g, 'https://' + resName + '/');
-                    }
-                    return origFetch.call(this, resource, init);
-                };
-            }
-        })();
-    </script>
     <script src="script.js"></script>
 </body>
 </html>
