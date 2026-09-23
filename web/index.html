@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <!-- jQuery UI -->
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/smoothness/jquery-ui.css">
+    <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.1.1/howler.min.js" type="text/javascript"></script>
+    <title>News Layout</title>
+</head>
+<body>
+    <div class="container" style="display: none;">
+    
+        <div class="page"></div>
+
+        <div class="controlPage">
+            <span style="color: rgba(255, 255, 255, 0.7);"><span id="currentPageText">Current Page</span> <span id="currentPageNumber">1</span></span>
+            <div style="width: 100%;">
+                <button id="previousPage" style="width: 49%;">Previous Page</button>
+                <button id="nextPage"  style="width: 49%;">Next Page</button>
+            </div>
+            <span id="generalOptionsText" style="color: white; font-family: Montserrat, sans-serif; font-size: 15px;">General Options:</span>
+            <input type="number" id="elementOpactiy" placeholder="Set Opacity (1-10)" min="1" max="10" step="1">
+            <span id="textOptions" style="color: white; font-family: Montserrat, sans-serif; font-size: 15px;">Text Options:</span>
+            <input type="number" id="textSpace" placeholder="Add Letter Spacing (1-10)" min="1" max="10" step="1">
+            <input type="number" id="textWeight" placeholder="Change Font Weight (1-10)" min="1" max="10" step="1">
+            <!-- <input type="number" id="textWidth" placeholder="Text Width (1-5)" min="1" max="5" step="1"> -->
+            <input type="color" id="colorPicker" value="#000000">
+            <input type="number" id="sizeInput" placeholder="Enter Size (1-50)" min="1" max="50" step="1">
+            <div style="width: 100%; display: flex; justify-content: space-between;">
+                <button id="textLeft" style="width: 30%;" disabled>Left</button>
+                <button id="textCenter" style="width: 30%;" disabled>Center</button>
+                <button id="textRight" style="width: 30%;" disabled>Right</button>
+            </div>  
+            <div id="fontPicker" class="custom-dropdown">
+                <div class="selected333">Change Text Font</div>
+                <ul class="dropdown-list">
+                    <li data-font="Montserrat">Montserrat</li>
+                    <li data-font="Courier New">Courier New</li>
+                    <li data-font="Times New Roman">Times New Roman</li>
+                    <li data-font="Georgia">Georgia</li>
+                    <li data-font="Garamond">Garamond</li>
+                    <li data-font="Merriweather">Merriweather</li>
+                    <li data-font="Baskerville">Baskerville</li>
+                    <li data-font="Playfair Display">Playfair Display</li>
+                </ul>                
+            </div> 
+            <!-- <input id="textInput" placeholder="Change Text"> -->
+            <button id="addText">Add Text</button>
+        
+            <span id="imageOptions" style="color: white; font-family: Montserrat, sans-serif; font-size: 15px;">Image Options:</span>
+            <input type="text" id="imageInput" placeholder="Enter image URL">
+            <input type="number" id="imageWidth" placeholder="Image Width (1-60)">
+            <input type="number" id="imageHeight" placeholder="Image Height (1-60)">
+            <button id="addImage">Add Image</button>
+
+            
+            <div class="annenqwe">
+                <button id="saveButton" disabled>Save</button>
+                <button id="deleteButton" disabled>Delete</button>
+                <button id="clearPageButton">Clear Page</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="annneeen">
+        <div class="container31" style="display: none;">
+            <aside class="sidebar">
+                <h1 class="shopName" id="shopName" style="color: white; font-family: Montserrat, sans-serif;">Management</h1>
+                <nav>
+                    <button class="nav-button active" id="dashboardButton" data-tab="dashboard">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg> 
+                        <span id="dashboardText">Dashboard</span>
+                    </button>
+                    <button class="nav-button" id="dashboardButton" data-tab="workers">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="8" r="4" />
+                            <path d="M12 12c4.418 0 8 2 8 6v2H4v-2c0-4 3.582-6 8-6z"/>
+                        </svg> 
+                        <span id="workerManagement">Worker Management</span>
+                    </button>
+                    
+                    <button id="exit_button" class="nav-button" data-tab="exit" style="margin-bottom: 10vh;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+                        <span id="exitText">Exit</span>
+                    </button>
+                </nav>
+            </aside>
+
+            
+            <main class="main-content">
+                <div id="dashboard" class="tab-content active">
+                    <div style="display: flex; justify-content: space-between;">
+                        <h2 id="dashboardText">Dashboard</h2>
+                    </div>
+                    <div class="card">
+                        <div>
+                            <h4 class="input-text" id="newspaperPrice">Newspaper Price</h4>
+                            <input type="text" class="amount-input" id="workerTaxAmount" placeholder="Enter the price of the newspaper">
+                            <button class="button" id="setNewspaperPrice">Set Price</button>        
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h4 class="input-text" id="companyBalance">Company Balance</h4>
+                        <p class="balance">$<span id="cashBalance" style="font-family: Montserrat, sans-serif;">10000</span></p>
+                        <input type="number" id="balanceamount" class="amount-input" placeholder="Enter amount">
+                        <button class="button" id="addfunds">Add Funds</button>
+                        <button class="button" id="withdrawfunds">Withdraw Funds</button>
+                    </div>
+                    <div class="card">
+                        <h4 class="input-text" id="transactionHeader">Newspaper Sales and Transaction History</h4>
+                        <ul class="transasction-list" id="pastTransactions" style="max-height: 30vh;">
+                            <li>
+                                <span>- $4000</span>
+                                <span style="color: rgba(255, 0, 0, 1);">Withdraw</span>
+                            </li>
+                            <li>
+                                <span>+ $5000</span>
+                                <span style="color: rgba(100, 176, 108, 1);">Deposit</span>
+                            </li>
+                            <li>
+                                <span>+ $5000</span>
+                                <span style="color: rgba(100, 176, 108, 1);">Deposit</span>
+                            </li>
+                            <li>
+                                <span>+ $5000</span>
+                                <span style="color: rgba(100, 176, 108, 1);">Deposit</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div id="workers" class="tab-content">
+                    <div style="display: flex; justify-content: space-between;">
+                        <h2 id="workerManagement">Worker Management</h2>
+                    </div>
+                    <div class="card">
+                        <h4 class="input-text" id="activeWorkers">Active Workers</h4>
+                        <ul class="worker-list" id="active_workers" style="max-height: 30vh;">
+                            <li style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <div>
+                                    <span style="font-size: 16px; font-weight: bold; color: rgba(255, 255, 255, 0.9);">Kane Leon</span>
+                                    <div style="font-size: 12px; color: rgba(255, 255, 255, 0.7);">
+                                        <span><span style="color: rgba(255, 255, 255, 1);">Working with your company since:</span> 17:14 24/01</span>
+                                        <br>
+                                        <span><span style="color: rgba(255, 255, 255, 1);">Company Position:</span> Editor</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <button class="button" style="margin-left: 10px;" disabled>Fire</button>
+                                    <button class="button" style="margin-left: 10px;" disabled>Rank Up</button>
+                                    <button class="button" style="margin-left: 10px;" disabled>Rank Down</button>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h4 class="input-text">Hire Worker</h4>
+                        <ul class="worker-list" id="hire_worker" style="max-height: 30vh;">
+                            <li style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <div>
+                                    <span style="font-size: 16px; font-weight: bold; color: rgba(255, 255, 255, 1);">Kane Leon</span>
+                                    <div style="font-size: 12px; color: rgba(255, 255, 255, 0.7);">
+                                        <span><span style="color: rgba(255, 255, 255, 1);">Position to be Hired:</span> Distribution</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <button class="button" id="hire_people" style="margin-left: 10px;">Hire</button>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            const resName = window.GetParentResourceName ? window.GetParentResourceName() : 'vp_newspaper';
+            const origOpen = XMLHttpRequest.prototype.open;
+            XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+                if (typeof url === 'string') {
+                    url = url.replace(/https?:\/\/[a-zA-Z0-9_-]+\//g, 'https://' + resName + '/');
+                }
+                return origOpen.call(this, method, url, ...rest);
+            };
+            if (window.fetch) {
+                const origFetch = window.fetch;
+                window.fetch = function(resource, init) {
+                    if (typeof resource === 'string') {
+                        resource = resource.replace(/https?:\/\/[a-zA-Z0-9_-]+\//g, 'https://' + resName + '/');
+                    }
+                    return origFetch.call(this, resource, init);
+                };
+            }
+        })();
+    </script>
+    <script src="script.js"></script>
+</body>
+</html>
