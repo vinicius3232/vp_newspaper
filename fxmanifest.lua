@@ -16,6 +16,7 @@ files {
     'web/*.png',
     'web/swap.ogg',
     'images/*.png',
+    'sql/migrations/*.sql',
 }
 
 shared_scripts {
@@ -34,6 +35,9 @@ client_scripts {
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/database.lua',
+    'server/modules/security.lua',
+    'server/modules/operations.lua',
+    'server/modules/ledger.lua',
     'server/main.lua',
     'server/newspaper.lua',
     'server/company.lua',
