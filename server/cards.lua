@@ -32,6 +32,33 @@ local function RollCardRarity(tierWeights)
     return 'basic'
 end
 
+local CustomCards = {}
+
+local function LoadCustomCards()
+    CustomCards = {}
+    local rows = MySQL.query.await('SELECT * FROM vp_custom_cards WHERE is_active = 1', {})
+    if rows then
+        for _, r in ipairs(rows) do
+            table.insert(CustomCards, {
+                id = r.card_id,
+                rarity = r.rarity,
+                title = r.title,
+                description = r.description,
+                image = r.image_url,
+                setName = r.set_name,
+                author = r.author_name,
+                isCustom = true,
+            })
+        end
+    end
+    print(('^2[vp_newspaper] Carregadas %d cartas customizadas da cidade no pool de sorteio.^7'):format(#CustomCards))
+end
+
+CreateThread(function()
+    Wait(1500)
+    LoadCustomCards()
+end)
+
 local function SelectCardByRarity(targetRarity)
     local pool = {}
     local allCards = Config.General.Collectibles.cards
@@ -40,6 +67,13 @@ local function SelectCardByRarity(targetRarity)
             table.insert(pool, data)
         end
     end
+    -- Incorpora as cartas customizadas criadas dinamicamente pelos repórteres/cidadãos
+    for _, custom in ipairs(CustomCards) do
+        if custom.rarity == targetRarity then
+            table.insert(pool, custom)
+        end
+    end
+
     if #pool == 0 then
         -- Fallback se pool vazia
         for _, data in pairs(allCards) do
@@ -280,4 +314,121 @@ lib.callback.register('vp_newspaper:server:sellCard', function(source, slot)
         grade = meta.grade or 0,
     }
 end)
+
+-- ============================================================================
+-- Callback: Criação Dinâmica de Novas Cartas (Living RP Minting Engine)
+-- ============================================================================
+lib.callback.register('vp_newspaper:server:createCustomCard', function(source, data)
+    local src = source
+    local player = QBCore.Functions.GetPlayer(src)
+    if not player then return { success = false, message = 'Jogador não encontrado' } end
+
+    local cfg = Config.General.Collectibles
+    local customCfg = cfg.customCards or { enabled = true, cost = 500, minGrade = 2 }
+
+    -- Verificação de Cargo / Permissão
+    local isAllowed = false
+    if Config.General.allowTestCommands then
+        isAllowed = true
+    else
+        local job = player.PlayerData.job
+        if job and job.name == (Config.General.jobName or 'reporter') and (job.grade and job.grade.level or 0) >= (customCfg.minGrade or 2) then
+            isAllowed = true
+        end
+    end
+
+    if not isAllowed then
+        return { success = false, message = 'Apenas Editores ou Chefes da Weazel News podem cunhar novas cartas.' }
+    end
+
+    -- Validação de Dados de Entrada
+    if not data or type(data) ~= 'table' then
+        return { success = false, message = 'Dados da carta inválidos.' }
+    end
+
+    local title = tostring(data.title or ''):gsub('^%s+', ''):gsub('%s+$', '')
+    local description = tostring(data.description or ''):gsub('^%s+', ''):gsub('%s+$', '')
+    local rarity = tostring(data.rarity or 'basic')
+    local imageUrl = tostring(data.image or ''):gsub('^%s+', ''):gsub('%s+$', '')
+    local setName = tostring(data.setName or customCfg.defaultSet or 'Edição Especial Weazel')
+
+    if #title < 3 or #title > 80 then
+        return { success = false, message = 'O título da carta deve ter entre 3 e 80 caracteres.' }
+    end
+
+    if #description < 5 or #description > 500 then
+        return { success = false, message = 'A descrição deve ter entre 5 e 500 caracteres.' }
+    end
+
+    if rarity ~= 'basic' and rarity ~= 'rare' and rarity ~= 'legendary' then
+        return { success = false, message = 'Raridade inválida (Comum, Rara ou Lendária).' }
+    end
+
+    if not (imageUrl:match('^https?://') or imageUrl:match('^cards/')) then
+        return { success = false, message = 'URL da imagem deve iniciar com http://, https:// ou caminho local cards/.' }
+    end
+
+    -- Cobrança da Taxa de Criação ($500)
+    local cost = customCfg.cost or 500
+    if player.PlayerData.money.cash < cost then
+        return { success = false, message = ('Dinheiro insuficiente. Custo de cunhagem: $%d.'):format(cost) }
+    end
+
+    player.Functions.RemoveMoney('cash', cost, 'mint-custom-card')
+
+    -- Gera identificador único da carta
+    local cardId = ('custom_%d_%d'):format(os.time(), math.random(100, 999))
+    local citizenid = player.PlayerData.citizenid
+    local authorName = (player.PlayerData.charinfo.firstname or 'Repórter') .. ' ' .. (player.PlayerData.charinfo.lastname or '')
+
+    -- Persiste no banco de dados
+    MySQL.insert([[
+        INSERT INTO vp_custom_cards 
+        (card_id, rarity, title, description, image_url, set_name, created_by, author_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ]], { cardId, rarity, title, description, imageUrl, setName, citizenid, authorName })
+
+    -- Atualiza cache imediatamente para que a carta entre no pool de boosters
+    LoadCustomCards()
+
+    -- Entrega o exemplar #001 (Edição de Autor) diretamente ao inventário do criador
+    local cardItemName = cfg.items.card or 'card'
+    local meta = {
+        cardId = cardId,
+        rarity = rarity,
+        title = title,
+        description = description,
+        image = imageUrl,
+        setName = setName,
+        isCustom = true,
+        author = authorName,
+        graded = false,
+    }
+    exports.ox_inventory:AddItem(src, cardItemName, 1, meta)
+
+    -- Registra na estante do autor
+    MySQL.insert('INSERT INTO vp_cards_shelf (citizenid, card_id, rarity, serial, grade) VALUES (?, ?, ?, ?, ?)', {
+        citizenid,
+        cardId,
+        rarity,
+        'MINT-001',
+        0,
+    })
+
+    -- Notificação global informando o lançamento da nova carta
+    local rarityLabel = cfg.rarities[rarity] and cfg.rarities[rarity].label or rarity
+    TriggerClientEvent('vp_newspaper:client:notify', -1, ('📰 Weazel News lançou uma nova carta oficial: "%s" (%s)! Já disponível nos boosters.'):format(title, rarityLabel), 'inform')
+
+    return {
+        success = true,
+        cardId = cardId,
+        title = title,
+    }
+end)
+
+-- Callback para listar todas as cartas customizadas criadas
+lib.callback.register('vp_newspaper:server:getCustomCards', function(source)
+    return CustomCards
+end)
+
 

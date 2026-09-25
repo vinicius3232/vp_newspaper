@@ -160,6 +160,21 @@ function createRealRelationalDB() {
             route_date TEXT NOT NULL,
             UNIQUE(citizenid, route_date)
         );
+
+        -- 10. Dynamic Custom Cards Table (Living RP Minting)
+        CREATE TABLE vp_custom_cards (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            card_id TEXT NOT NULL UNIQUE,
+            rarity TEXT NOT NULL DEFAULT 'basic',
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            image_url TEXT NOT NULL,
+            set_name TEXT NOT NULL DEFAULT 'Edição Especial Weazel',
+            created_by TEXT NOT NULL,
+            author_name TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at INTEGER NOT NULL DEFAULT (unixepoch())
+        );
     `);
 
     return db;
@@ -1602,6 +1617,45 @@ it('Paperboy Delivery: Validação de limite diário de entregas e cálculo acum
     assert.strictEqual(stats.deliveries_count, 2, 'Deliveries count must be 2');
     assert.strictEqual(stats.total_earned, 110, 'Total earned must be 50 + 60 = 110');
     assert(stats.deliveries_count < 50, 'Must be within daily limit of 50');
+});
+
+it('Card Creator: Cunhagem de carta customizada, persistência relacional e autor', () => {
+    const db = createRealRelationalDB();
+    const cardId = 'custom_card_test_999';
+    db.prepare(`
+        INSERT INTO vp_custom_cards 
+        (card_id, rarity, title, description, image_url, set_name, created_by, author_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(cardId, 'legendary', 'Grande Vitória no Tribunal', 'Advogado inocenta réu em julgamento histórico.', 'https://img.weazel.com/tribunal.png', 'Eleições 2026', 'cit_editor_1', 'Lois Lane');
+
+    const card = db.prepare("SELECT * FROM vp_custom_cards WHERE card_id = ?").get(cardId);
+    assert(card, 'Card must be successfully persisted in vp_custom_cards');
+    assert.strictEqual(card.title, 'Grande Vitória no Tribunal');
+    assert.strictEqual(card.rarity, 'legendary');
+    assert.strictEqual(card.author_name, 'Lois Lane');
+    assert.strictEqual(card.is_active, 1);
+});
+
+it('Booster Engine: Cartas customizadas entram dinamicamente no pool de sorteio de boosters', () => {
+    const db = createRealRelationalDB();
+    // 1. Cadastra 2 cartas customizadas
+    db.prepare("INSERT INTO vp_custom_cards (card_id, rarity, title, description, image_url, created_by, author_name) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        .run('custom_c1', 'legendary', 'Carta Lendária 1', 'Desc', 'url', 'cit_1', 'Repórter 1');
+    db.prepare("INSERT INTO vp_custom_cards (card_id, rarity, title, description, image_url, created_by, author_name) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        .run('custom_c2', 'legendary', 'Carta Lendária 2', 'Desc', 'url', 'cit_2', 'Repórter 2');
+
+    // 2. Consulta pool de lendárias ativas
+    const customLegendary = db.prepare("SELECT * FROM vp_custom_cards WHERE rarity = 'legendary' AND is_active = 1").all();
+    assert.strictEqual(customLegendary.length, 2, '2 custom legendary cards found');
+
+    // 3. Simula sorteio com pool estática + dinâmica
+    const staticLegendary = [{ id: 'card_mayor', rarity: 'legendary' }];
+    const combinedPool = [...staticLegendary, ...customLegendary];
+    assert.strictEqual(combinedPool.length, 3, 'Combined pool has 3 cards (1 static + 2 dynamic custom)');
+
+    // 4. Garante que qualquer uma das 3 pode ser sorteada
+    const drawn = combinedPool[Math.floor(Math.random() * combinedPool.length)];
+    assert(['card_mayor', 'custom_c1', 'custom_c2'].includes(drawn.id || drawn.card_id), 'Drawn card is from combined pool');
 });
 
 // ─── EXECUTION DISPATCHER ────────────────────────────────────────

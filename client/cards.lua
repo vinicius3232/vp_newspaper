@@ -303,6 +303,83 @@ RegisterCommand('vendercarta', function()
 end, false)
 
 -- ============================================================================
+-- Editor & Criador de Cartas Dinâmicas Weazel News (/criarcarta)
+-- ============================================================================
+local function OpenCreateCardDialog()
+    local cfg = Config.General.Collectibles
+    local customCfg = cfg.customCards or { cost = 500, minGrade = 2 }
+
+    local input = lib.inputDialog('🎨 Cunhar Nova Carta Weazel News', {
+        { type = 'input', label = 'Título da Carta', placeholder = 'Ex: Flagrante da Operação Poseidon', required = true, min = 3, max = 80 },
+        { type = 'select', label = 'Raridade', options = {
+            { value = 'basic', label = 'Comum (Basic)' },
+            { value = 'rare', label = 'Rara (Rare)' },
+            { value = 'legendary', label = 'Lendária (Legendary)' },
+        }, default = 'basic', required = true },
+        { type = 'input', label = 'Nome da Coleção / Set', placeholder = 'Ex: Arquivos Secretos de Los Santos 2026', default = 'Edição Especial Weazel' },
+        { type = 'input', label = 'URL da Imagem / Foto', placeholder = 'https://... ou cards/nomedafoto.png', required = true },
+        { type = 'textarea', label = 'Descrição / História do Fato', placeholder = 'Descreva os acontecimentos que levaram à criação desta carta comemorativa...', required = true, min = 5, max = 500 },
+    })
+
+    if not input then return end
+
+    local payload = {
+        title = input[1],
+        rarity = input[2],
+        setName = input[3],
+        image = input[4],
+        description = input[5],
+    }
+
+    local rarityNames = { basic = 'Comum', rare = 'Rara', legendary = 'Lendária' }
+    local confirm = lib.alertDialog({
+        header = 'Confirmar Cunhagem da Carta',
+        content = ('**Título:** %s\n**Raridade:** %s\n**Coleção:** %s\n\nCusto de Produção: **$%d** em dinheiro.\n\n_Ao confirmar, a carta entrará imediatamente no pool de sorteio de todos os Booster Packs do servidor, e você receberá o exemplar nº 001._'):format(
+            payload.title,
+            rarityNames[payload.rarity] or payload.rarity,
+            payload.setName,
+            customCfg.cost or 500
+        ),
+        centered = true,
+        cancel = true,
+    })
+
+    if confirm ~= 'confirm' then return end
+
+    local progress = lib.progressBar({
+        duration = 5000,
+        label = 'Imprimindo tiragem comemorativa e cunhando selo Weazel...',
+        useWhileDead = false,
+        canCancel = false,
+        disable = { move = true, car = true, combat = true },
+    })
+
+    if progress then
+        local res = lib.callback.await('vp_newspaper:server:createCustomCard', false, payload)
+        if res and res.success then
+            PlaySoundFrontend(-1, 'CHECKPOINT_PERFECT', 'HUD_MINI_GAME_SOUNDSET', true)
+            lib.alertDialog({
+                header = '🌟 Carta Criada com Sucesso!',
+                content = ('A carta **"%s"** foi registrada com sucesso no arquivo oficial da Weazel News!\n\nVocê recebeu o exemplar comemorativo no seu inventário e a carta já pode ser obtida em Booster Packs por qualquer cidadão da cidade.'):format(res.title),
+                centered = true,
+                cancel = false,
+            })
+        else
+            lib.notify({
+                title = 'Criação de Cartas',
+                description = (res and res.message) or 'Falha ao criar a carta.',
+                type = 'error',
+            })
+        end
+    end
+end
+
+RegisterCommand('criarcarta', function()
+    OpenCreateCardDialog()
+end, false)
+
+
+-- ============================================================================
 -- Leitor de Revistas / Quadrinhos Colecionáveis (Comics)
 -- ============================================================================
 local function ReadComicBook(comicId)

@@ -9,6 +9,7 @@ local migrations = {
     'sql/migrations/004_posters.sql',
     'sql/migrations/005_speakers_system.sql',
     'sql/migrations/006_collectibles_and_leads.sql',
+    'sql/migrations/007_custom_cards.sql',
 }
 
 DatabaseReady = false

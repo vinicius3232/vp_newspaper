@@ -339,6 +339,12 @@ Config.General = {
             cost = 100,
             openingTimeMs = 4000,
         },
+        customCards = {
+            enabled = true,
+            cost = 500,
+            minGrade = 2, -- Editor ou Chefe da Weazel News
+            defaultSet = 'Edição Comemorativa Weazel',
+        },
     },
 
     -- Jornalismo de Campo: Spots de Reportagem, Entrevistas & Pautas Ativas (vp_leads)
