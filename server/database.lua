@@ -8,6 +8,7 @@ local migrations = {
     'sql/migrations/003_editor_sessions.sql',
     'sql/migrations/004_posters.sql',
     'sql/migrations/005_speakers_system.sql',
+    'sql/migrations/006_collectibles_and_leads.sql',
 }
 
 DatabaseReady = false

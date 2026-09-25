@@ -40,6 +40,9 @@ client_scripts {
     'client/speakers_attach.lua',
     'client/broadcast_van.lua',
     'client/newsroom_display.lua',
+    'client/cards.lua',
+    'client/field.lua',
+    'client/throw.lua',
     'client/admin.lua',
     'client/main.lua',
 }
@@ -60,6 +63,9 @@ server_scripts {
     'server/radio.lua',
     'server/speakers_attach.lua',
     'server/broadcast_van.lua',
+    'server/cards.lua',
+    'server/field.lua',
+    'server/throw.lua',
     'server/admin.lua',
     'server/modules/oxmysql_smoke.lua',
 }

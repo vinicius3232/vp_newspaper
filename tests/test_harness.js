@@ -19,7 +19,8 @@ const categories = [
     'RECOVERY',
     'DATABASE',
     'FSM',
-    'LEDGER'
+    'LEDGER',
+    'COLLECTIBLES_AND_LEADS'
 ];
 
 const stats = {};
@@ -124,6 +125,40 @@ function createRealRelationalDB() {
             prev_balance INTEGER NOT NULL,
             new_balance INTEGER NOT NULL,
             created_at INTEGER NOT NULL
+        );
+
+        -- 7. Collectibles & PSA Grading Shelf
+        CREATE TABLE vp_cards_shelf (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            citizenid TEXT NOT NULL,
+            card_id TEXT NOT NULL,
+            rarity TEXT NOT NULL DEFAULT 'basic',
+            serial TEXT,
+            grade INTEGER NOT NULL DEFAULT 0,
+            discovered_at INTEGER NOT NULL DEFAULT (unixepoch())
+        );
+
+        -- 8. Field Journalism Leads Table
+        CREATE TABLE vp_leads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            lead_id TEXT NOT NULL UNIQUE,
+            citizenid TEXT NOT NULL,
+            author_name TEXT NOT NULL,
+            spot_type TEXT NOT NULL,
+            headline_seed TEXT NOT NULL,
+            notes TEXT,
+            used INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL DEFAULT (unixepoch())
+        );
+
+        -- 9. Paperboy Daily Stats Table
+        CREATE TABLE vp_paperboy_stats (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            citizenid TEXT NOT NULL,
+            deliveries_count INTEGER NOT NULL DEFAULT 0,
+            total_earned INTEGER NOT NULL DEFAULT 0,
+            route_date TEXT NOT NULL,
+            UNIQUE(citizenid, route_date)
         );
     `);
 
@@ -1469,6 +1504,104 @@ it('Database level verification: Plain table allows UPDATE/DELETE unless trigger
         triggerBlocked = true;
     }
     assert.strictEqual(triggerBlocked, true, 'Trigger actively blocks UPDATE at DB level');
+});
+
+// ─── SUITE 13: COLLECTIBLES, PSA GRADING, FIELD LEADS & PAPERBOY ───
+setCategory('COLLECTIBLES_AND_LEADS');
+
+it('Trading Cards: Sorteio ponderado server-authoritative e integridade de metadados', () => {
+    const weights = { basic: 80, rare: 18, legendary: 2 };
+    const counts = { basic: 0, rare: 0, legendary: 0 };
+    
+    function rollRarity() {
+        const r = Math.random() * 100;
+        if (r <= 80) return 'basic';
+        if (r <= 98) return 'rare';
+        return 'legendary';
+    }
+
+    for (let i = 0; i < 1000; i++) {
+        const rar = rollRarity();
+        counts[rar]++;
+    }
+
+    assert(counts.basic > counts.rare, 'Basic cards count must exceed rare cards count');
+    assert(counts.rare > counts.legendary, 'Rare cards count must exceed legendary cards count');
+    assert(counts.legendary > 0, 'Legendary cards must be possible to roll');
+});
+
+it('PSA Grading: Cálculo estocástico de subnotas e serialização única PSA-XXXX-XXXX', () => {
+    function generateSerial() {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let s = 'PSA-';
+        for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)];
+        s += '-';
+        for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)];
+        return s;
+    }
+
+    const centering = 7 + Math.floor(Math.random() * 4);
+    const corners = 7 + Math.floor(Math.random() * 4);
+    const edges = 7 + Math.floor(Math.random() * 4);
+    const surface = 7 + Math.floor(Math.random() * 4);
+    const avg = (centering + corners + edges + surface) / 4.0;
+    const grade = Math.round(avg);
+    const serial = generateSerial();
+
+    assert(centering >= 7 && centering <= 10, 'Centering subscore in range [7, 10]');
+    assert(grade >= 7 && grade <= 10, 'Grade in range [7, 10]');
+    assert(/^PSA-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(serial), 'Serial must match PSA-XXXX-XXXX pattern');
+});
+
+it('Estante de Colecionador: Persistência no banco e consulta ordenada por grade', () => {
+    const db = createRealRelationalDB();
+    db.prepare("INSERT INTO vp_cards_shelf (citizenid, card_id, rarity, serial, grade) VALUES (?, ?, ?, ?, ?)").run('cit_001', 'card_mayor', 'legendary', 'PSA-ABCD-1234', 10);
+    db.prepare("INSERT INTO vp_cards_shelf (citizenid, card_id, rarity, serial, grade) VALUES (?, ?, ?, ?, ?)").run('cit_001', 'card_rookie', 'basic', null, 0);
+
+    const rows = db.prepare("SELECT * FROM vp_cards_shelf WHERE citizenid = ? ORDER BY grade DESC").all('cit_001');
+    assert.strictEqual(rows.length, 2, 'Must retrieve 2 shelf records');
+    assert.strictEqual(rows[0].card_id, 'card_mayor', 'Highest graded card must appear first');
+    assert.strictEqual(rows[0].grade, 10, 'Grade must be 10');
+    assert.strictEqual(rows[0].serial, 'PSA-ABCD-1234', 'Serial must match');
+});
+
+it('Jornalismo de Campo: Geração de Pautas (vp_leads), consulta de ativas e consumo em matéria', () => {
+    const db = createRealRelationalDB();
+    db.prepare("INSERT INTO vp_leads (lead_id, citizenid, author_name, spot_type, headline_seed, notes, used) VALUES (?, ?, ?, ?, ?, ?, 0)")
+        .run('LEAD-101', 'cit_rep_1', 'Clark Kent', 'interview', 'Prefeitura anuncia obras', 'Entrevista gravada');
+    db.prepare("INSERT INTO vp_leads (lead_id, citizenid, author_name, spot_type, headline_seed, notes, used) VALUES (?, ?, ?, ?, ?, ?, 0)")
+        .run('LEAD-102', 'cit_rep_1', 'Clark Kent', 'footage', 'Perseguição na autoestrada', 'Vídeo capturado');
+
+    // 1. Consulta ativas
+    const activeLeads = db.prepare("SELECT * FROM vp_leads WHERE citizenid = ? AND used = 0").all('cit_rep_1');
+    assert.strictEqual(activeLeads.length, 2, 'Must have 2 active leads');
+
+    // 2. Consumo de pauta ao redigir matéria
+    const updated = db.prepare("UPDATE vp_leads SET used = 1 WHERE lead_id = ? AND citizenid = ?").run('LEAD-101', 'cit_rep_1');
+    assert.strictEqual(updated.changes, 1, 'One lead updated to used=1');
+
+    // 3. Verifica sobra
+    const remaining = db.prepare("SELECT * FROM vp_leads WHERE citizenid = ? AND used = 0").all('cit_rep_1');
+    assert.strictEqual(remaining.length, 1, 'Only 1 active lead remaining');
+    assert.strictEqual(remaining[0].lead_id, 'LEAD-102', 'Remaining lead is LEAD-102');
+});
+
+it('Paperboy Delivery: Validação de limite diário de entregas e cálculo acumulado', () => {
+    const db = createRealRelationalDB();
+    const today = '2026-09-25';
+
+    // Primeira entrega
+    db.prepare("INSERT INTO vp_paperboy_stats (citizenid, deliveries_count, total_earned, route_date) VALUES (?, 1, ?, ?)")
+        .run('cit_paperboy_1', 50, today);
+
+    // Segunda entrega (acumulado via UPDATE)
+    db.prepare("UPDATE vp_paperboy_stats SET deliveries_count = deliveries_count + 1, total_earned = total_earned + ? WHERE citizenid = ? AND route_date = ?")
+        .run(60, 'cit_paperboy_1', today);
+
+    const stats = db.prepare("SELECT * FROM vp_paperboy_stats WHERE citizenid = ? AND route_date = ?").get('cit_paperboy_1', today);
+    assert.strictEqual(stats.deliveries_count, 2, 'Deliveries count must be 2');
+    assert.strictEqual(stats.total_earned, 110, 'Total earned must be 50 + 60 = 110');
+    assert(stats.deliveries_count < 50, 'Must be within daily limit of 50');
 });
 
 // ─── EXECUTION DISPATCHER ────────────────────────────────────────

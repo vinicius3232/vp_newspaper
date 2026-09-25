@@ -283,6 +283,76 @@ Config.General = {
         category = 'Noticiário Central',
     },
 
+    -- Sistema de Colecionáveis: Trading Cards, Boosters & PSA Grading
+    Collectibles = {
+        enabled = true,
+        items = {
+            card = 'card',
+            boosterPack = 'booster_pack',
+            psaCase = 'psa_case',
+            comicBook = 'comic_book',
+        },
+        rarities = {
+            basic = { label = 'Comum', color = '#94a3b8', weight = 70, effect = 'none' },
+            rare = { label = 'Rara', color = '#38bdf8', weight = 24, effect = 'sparkles' },
+            legendary = { label = 'Lendária', color = '#fbbf24', weight = 6, effect = 'shine' },
+        },
+        cards = {
+            ['card_mayor'] = { id = 'card_mayor', rarity = 'legendary', title = 'O Prefeito de Los Santos', description = 'Retrato oficial da posse na prefeitura.', image = 'cards/mayor.png' },
+            ['card_chief_police'] = { id = 'card_chief_police', rarity = 'legendary', title = 'Comandante da LSPD', description = 'Operação especial contra o cartel em 2024.', image = 'cards/chief_police.png' },
+            ['card_weazel_heli'] = { id = 'card_weazel_heli', rarity = 'rare', title = 'Helicóptero Weazel News', description = 'Flagrante aéreo da perseguição na autoestrada.', image = 'cards/weazel_heli.png' },
+            ['card_bank_heist'] = { id = 'card_bank_heist', rarity = 'rare', title = 'O Grande Assalto ao Fleeca', description = 'Primeira página histórica da edição 42.', image = 'cards/bank_heist.png' },
+            ['card_vinewood_star'] = { id = 'card_vinewood_star', rarity = 'rare', title = 'Estrela de Vinewood', description = 'A premiação mais polêmica do cinema.', image = 'cards/vinewood_star.png' },
+            ['card_rookie_reporter'] = { id = 'card_rookie_reporter', rarity = 'basic', title = 'Repórter Estagiário', description = 'A busca incansável pela primeira grande matéria.', image = 'cards/rookie_reporter.png' },
+            ['card_news_van'] = { id = 'card_news_van', rarity = 'basic', title = 'Furgão de Transmissão Weazel', description = 'Unidade móvel operando nas madrugadas.', image = 'cards/news_van.png' },
+            ['card_coffee_break'] = { id = 'card_coffee_break', rarity = 'basic', title = 'Café da Redação', description = 'O combustível dos redatores de plantão.', image = 'cards/coffee_break.png' },
+            ['card_press_room'] = { id = 'card_press_room', rarity = 'basic', title = 'Rotativa de Imprensa', description = 'Milhares de páginas sendo impressas ao vivo.', image = 'cards/press_room.png' },
+        },
+        boosters = {
+            ['booster_common'] = { name = 'Pacote Weazel Básico', tier = 'common', count = 3, weights = { basic = 80, rare = 18, legendary = 2 } },
+            ['booster_premium'] = { name = 'Pacote Weazel Ouro', tier = 'premium', count = 5, weights = { basic = 50, rare = 40, legendary = 10 } },
+        },
+        grading = {
+            cost = 100,
+            openingTimeMs = 4000,
+        },
+    },
+
+    -- Jornalismo de Campo: Spots de Reportagem, Entrevistas & Pautas Ativas (vp_leads)
+    FieldJournalism = {
+        enabled = true,
+        acceptChance = 0.85,
+        cooldownSeconds = 180,
+        rewardRange = { 150, 300 },
+        spots = {
+            { id = 'spot_cityhall', name = 'Entrevista na Prefeitura', type = 'interview', coords = vector3(-545.0, -204.0, 38.2), heading = 210.0, npcModel = 'a_m_m_business_01', headlineSeed = 'Prefeitura anuncia novo plano de infraestrutura urbana' },
+            { id = 'spot_lspd', name = 'Boletim da LSPD (Mission Row)', type = 'interview', coords = vector3(441.2, -982.0, 30.68), heading = 90.0, npcModel = 's_m_y_cop_01', headlineSeed = 'LSPD divulga balanço de apreensões e combate ao crime' },
+            { id = 'spot_pillbox', name = 'Plantão Médico no Hospital Pillbox', type = 'footage', coords = vector3(308.5, -595.0, 43.28), heading = 18.0, npcModel = 's_m_m_doctor_01', headlineSeed = 'Hospital Central registra recorde de atendimentos de emergência' },
+            { id = 'spot_legion', name = 'Voz do Cidadão na Praça Legion', type = 'interview', coords = vector3(193.5, -934.0, 30.68), heading = 140.0, npcModel = 'a_f_y_hipster_01', headlineSeed = 'População opina sobre segurança pública no centro' },
+            { id = 'spot_dock', name = 'Movimentação Suspeita nas Docas', type = 'footage', coords = vector3(-153.0, -2385.0, 6.0), heading = 50.0, npcModel = 's_m_y_dockwork_01', headlineSeed = 'Investigação especial: logística portuária e fiscalização' },
+        },
+    },
+
+    -- Entrega Paperboy: Rota Ágil de Bicicleta com Arremesso Físico
+    Paperboy = {
+        enabled = true,
+        bikeModel = 'cruiser',
+        spawnCoord = vector4(-552.0, -943.0, 23.85, 270.0),
+        returnCoord = vector3(-553.5, -940.0, 23.85),
+        throwCooldownMs = 2500,
+        maxThrowDistance = 18.0,
+        dailyLimit = 50,
+        rewardPerThrow = { 45, 85 },
+        throwTargets = {
+            { id = 1, coords = vector3(-567.45, -922.34, 23.88), label = 'Banca Weazel Plaza' },
+            { id = 2, coords = vector3(-605.0, -960.0, 22.0), label = 'Residência Alta St' },
+            { id = 3, coords = vector3(-630.0, -890.0, 24.5), label = 'Apartamento Vespucci Blvd' },
+            { id = 4, coords = vector3(-520.0, -870.0, 27.0), label = 'Comércio Boulevard Del Perro' },
+            { id = 5, coords = vector3(-480.0, -920.0, 23.5), label = 'Edifício Comercial Rockford' },
+            { id = 6, coords = vector3(-450.0, -980.0, 23.8), label = 'Entrada Sul San Andreas Ave' },
+        },
+    },
+
     -- Bancas fixas iniciais pré-configuradas (caso não use apenas DB)
     defaultBoxes = {
         { id = 1, coords = vector4(-567.45, -922.34, 23.88, 178.5), stock = 15 },

@@ -174,6 +174,13 @@ local function EnterViewfinderMode()
             AddTextComponentSubstringPlayerName(('ZOOM: %d%%  |  FOV: %.1f'):format(zoomPct, currentFov))
             EndTextCommandDisplayText(0.80, 0.07)
 
+            -- Oculta HUD padrão e radar
+            HideHudAndRadarThisFrame()
+
+            -- Barras Cinematográficas Letterbox (Broadcast Format)
+            DrawRect(0.5, 0.025, 1.0, 0.05, 0, 0, 0, 255)
+            DrawRect(0.5, 0.975, 1.0, 0.05, 0, 0, 0, 255)
+
             -- Linha de Grade Central (Retículo de Foco)
             DrawRect(0.5, 0.5, 0.02, 0.002, 255, 255, 255, 120)
             DrawRect(0.5, 0.5, 0.002, 0.02, 255, 255, 255, 120)

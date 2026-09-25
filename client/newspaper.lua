@@ -271,3 +271,40 @@ RegisterNUICallback('rybuterol_NUICallback_SayfaDegis', HandlePageChange)
 
 RegisterNUICallback('notify', HandleNotify)
 RegisterNUICallback('rybuterol_NUICallback_notify', HandleNotify)
+
+-- ==========================================================
+-- Integração com VP Tablet (App Weazel News)
+-- ==========================================================
+local function registerNewspaperTabletApp()
+    if GetResourceState('vp_tablet') ~= 'started' then return end
+
+    pcall(function()
+        exports['vp_tablet']:RegisterApp({
+            identifier  = 'vp_newspaper',
+            name        = 'Weazel News',
+            description = 'Portal oficial de notícias, artigos diários, reportagens e classificados de Los Santos.',
+            icon        = 'https://cdn-icons-png.flaticon.com/512/2965/2965879.png',
+            defaultApp  = true,
+            removable   = false,
+            category    = 'services',
+            author      = 'Weazel News Corp',
+            onOpen      = function()
+                exports['vp_tablet']:CloseTablet()
+                TriggerServerEvent('vp_newspaper:server:openReader')
+            end
+        })
+    end)
+end
+
+CreateThread(function()
+    Wait(2500)
+    registerNewspaperTabletApp()
+end)
+
+AddEventHandler('onResourceStart', function(resName)
+    if resName == 'vp_tablet' then
+        Wait(1500)
+        registerNewspaperTabletApp()
+    end
+end)
+

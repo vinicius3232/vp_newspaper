@@ -342,3 +342,16 @@ ensure vp_newspaper
 4. As tabelas do banco de dados são migradas e estruturadas automaticamente na inicialização via `sql/migrations/` (incluindo `005_speakers_system.sql`).
 5. Consulte a documentação complementar detalhada na pasta [`docs/`](file:///docs/), especialmente [`docs/RADIO_AND_SPEAKERS.md`](file:///docs/RADIO_AND_SPEAKERS.md).
 
+---
+
+## 📱 8. Integração com o Ecossistema (`vp_tablet`)
+
+* **App Weazel News no Tablet:**
+  * Registrado nativamente no Launcher e App Store do `vp_tablet` (`weazel_news`).
+  * Cidadãos podem abrir o leitor de jornal digital diretamente pela tela do tablet com interface glassmorphism, virada de páginas e áudio imersivo de folheamento de papel.
+  * Dispensa carregar o prop físico de jornal para consultas rápidas de notícias, classificados e comunicados governamentais.
+* **Empresa Homologada no Tablet:**
+  * Registrada em `Config.Services.Companies` do `vp_tablet` com o job `reporter`.
+  * Repórteres e editores podem gerenciar canais de denúncia da população, notas de imprensa e chamados de pauta diretamente pelo tablet corporativo.
+
+
