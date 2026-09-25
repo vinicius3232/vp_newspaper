@@ -31,15 +31,17 @@ RegisterNetEvent('nproblem_newspaper_back', function()
     -- 1. Rate Limit (Tier: FAST)
     if not Security.CheckRateLimit(src, 'open_editor', 'FAST') then return end
 
+    local isDebug = Config.General and (Config.General.debugs or Config.General.allowTestCommands)
+
     -- 2. Distância Física (Max 2.0m)
-    local okDist = Security.ValidateDistance(src, Config.General.Coords.editorCoord, 'EDITOR')
+    local okDist = isDebug or Security.ValidateDistance(src, Config.General.Coords.editorCoord, 'EDITOR')
     if not okDist then
         NotifyPlayer(src, 'Você precisa estar junto ao computador da redação.', 'error')
         return
     end
 
     -- 3. Autorização: Apenas membros da equipe da redação
-    local isAuth = Security.IsAuthorized(src, Config.General.jobName, 0, true)
+    local isAuth = isDebug or Security.IsAuthorized(src, Config.General.jobName, 0, true)
     if not isAuth then
         NotifyPlayer(src, 'Apenas jornalistas da Weazel News podem redigir matérias!', 'error')
         return
@@ -48,7 +50,7 @@ RegisterNetEvent('nproblem_newspaper_back', function()
     local now = os.time()
 
     -- 4. Verificação de Sessão Ativa com TTL (Prevenção de Stale Lock)
-    if ActiveEditorSession then
+    if not isDebug and ActiveEditorSession then
         if ActiveEditorSession.src ~= src and ActiveEditorSession.expiresAt > now then
             NotifyPlayer(src, _U('editorMasa'), 'error')
             return
@@ -72,6 +74,7 @@ RegisterNetEvent('nproblem_newspaper_back', function()
     ]], { newSessionId, cid, src })
 
     GetNewspaperPage('page1', function(data)
+        print(('^2[vp_newspaper] Enviando clen:openUI para o jogador %s com sessão %s^7'):format(src, newSessionId))
         TriggerClientEvent('clen:openUI', src, data, newSessionId)
     end)
 end)
@@ -122,15 +125,17 @@ RegisterNetEvent('clen:saveTexts', function(cbData, pageNum, expectedRevision)
         return
     end
 
+    local isDebug = Config.General and (Config.General.debugs or Config.General.allowTestCommands)
+
     -- 2. Distância Física
-    local okDist = Security.ValidateDistance(src, Config.General.Coords.editorCoord, 'EDITOR')
+    local okDist = isDebug or Security.ValidateDistance(src, Config.General.Coords.editorCoord, 'EDITOR')
     if not okDist then
         NotifyPlayer(src, 'Você precisa estar na redação para salvar.', 'error')
         return
     end
 
     -- 3. Autorização
-    local isAuth = Security.IsAuthorized(src, Config.General.jobName, 0, true)
+    local isAuth = isDebug or Security.IsAuthorized(src, Config.General.jobName, 0, true)
     if not isAuth then
         NotifyPlayer(src, 'Não autorizado a alterar o conteúdo editorial!', 'error')
         return
@@ -185,6 +190,7 @@ RegisterNetEvent('clen:saveTexts', function(cbData, pageNum, expectedRevision)
 
     local result = MySQL.query.await(updateQuery, params)
 
+    local newRevision = 1
     if not result or result.affectedRows == 0 then
         -- Conflito de versão ou página não encontrada
         if expectedRevision then
@@ -195,12 +201,19 @@ RegisterNetEvent('clen:saveTexts', function(cbData, pageNum, expectedRevision)
             MySQL.query.await('INSERT INTO `newspaper_texts` (`page`, `general`, `revision`, `updated_by`) VALUES (?, ?, 1, ?)', {
                 pageKey, generalJson, cid
             })
+            newRevision = 1
         end
+    else
+        local revRow = MySQL.single.await('SELECT `revision` FROM `newspaper_texts` WHERE `page` = ?', { pageKey })
+        newRevision = revRow and revRow.revision or ((expectedRevision or 1) + 1)
     end
+
+    -- Sincroniza a nova revisão com o editor local do cliente (fecha o ciclo OCC)
+    TriggerClientEvent('clen:updateRevision', src, pageNum, newRevision)
 
     NotifyPlayer(src, _U('madeChanges'), 'success')
     local pName = player.PlayerData.charinfo.firstname .. ' ' .. player.PlayerData.charinfo.lastname
-    SendDiscordLog('Edição de Jornal Atualizada', ('O repórter **%s** salvou alterações na **Página %s**.'):format(pName, tostring(pageNum)), 3066993)
+    SendDiscordLog('Edição de Jornal Atualizada', ('O repórter **%s** salvou alterações na **Página %s** (Rev %d).'):format(pName, tostring(pageNum), newRevision), 3066993)
 end)
 
 RegisterNetEvent('clen:removeText', function(elementId, pageNum)
@@ -208,26 +221,40 @@ RegisterNetEvent('clen:removeText', function(elementId, pageNum)
     local player = GetPlayer(src)
     if not player then return end
 
+    if not Security.CheckRateLimit(src, 'remove_text', 'FAST') then return end
+
+    local okDist = Security.ValidateDistance(src, Config.General.Coords.editorCoord, 'EDITOR')
+    if not okDist then
+        NotifyPlayer(src, 'Você precisa estar na redação para editar páginas.', 'error')
+        return
+    end
+
     local isAuth = Security.IsAuthorized(src, Config.General.jobName, 0, true)
     if not isAuth then return end
+
+    if not ActiveEditorSession or ActiveEditorSession.src ~= src or os.time() > ActiveEditorSession.expiresAt then
+        NotifyPlayer(src, 'Você não possui uma sessão ativa de edição.', 'error')
+        return
+    end
 
     if not elementId or not pageNum then return end
 
     local pageKey = 'page' .. tostring(pageNum)
-    MySQL.query('SELECT `general` FROM `newspaper_texts` WHERE `page` = ? LIMIT 1', { pageKey }, function(results)
-        if results and results[1] then
-            local elements = json.decode(results[1].general) or {}
-            local updated = {}
-            for _, item in ipairs(elements) do
-                if tostring(item.id) ~= tostring(elementId) then
-                    table.insert(updated, item)
-                end
+    local pageRow = MySQL.single.await('SELECT `general`, `revision` FROM `newspaper_texts` WHERE `page` = ? LIMIT 1', { pageKey })
+    if pageRow then
+        local elements = json.decode(pageRow.general) or {}
+        local updated = {}
+        for _, item in ipairs(elements) do
+            if tostring(item.id) ~= tostring(elementId) then
+                table.insert(updated, item)
             end
-            local generalJson = json.encode(updated)
-            MySQL.query('UPDATE `newspaper_texts` SET `general` = ?, `revision` = `revision` + 1 WHERE `page` = ?', { generalJson, pageKey })
-            NotifyPlayer(src, _U('madeChanges'), 'success')
         end
-    end)
+        local generalJson = json.encode(updated)
+        local newRev = (pageRow.revision or 1) + 1
+        MySQL.query.await('UPDATE `newspaper_texts` SET `general` = ?, `revision` = ? WHERE `page` = ?', { generalJson, newRev, pageKey })
+        TriggerClientEvent('clen:updateRevision', src, pageNum, newRev)
+        NotifyPlayer(src, _U('madeChanges'), 'success')
+    end
 end)
 
 RegisterNetEvent('clen:removeTextAll', function(pageNum)
@@ -235,15 +262,30 @@ RegisterNetEvent('clen:removeTextAll', function(pageNum)
     local player = GetPlayer(src)
     if not player then return end
 
+    if not Security.CheckRateLimit(src, 'remove_text_all', 'FAST') then return end
+
+    local okDist = Security.ValidateDistance(src, Config.General.Coords.editorCoord, 'EDITOR')
+    if not okDist then
+        NotifyPlayer(src, 'Você precisa estar na redação para limpar a página.', 'error')
+        return
+    end
+
     local isAuth = Security.IsAuthorized(src, Config.General.jobName, 0, true)
     if not isAuth then return end
+
+    if not ActiveEditorSession or ActiveEditorSession.src ~= src or os.time() > ActiveEditorSession.expiresAt then
+        NotifyPlayer(src, 'Você não possui uma sessão ativa de edição.', 'error')
+        return
+    end
 
     if not pageNum then return end
 
     local pageKey = 'page' .. tostring(pageNum)
-    MySQL.query('UPDATE `newspaper_texts` SET `general` = \'[]\', `revision` = `revision` + 1 WHERE `page` = ?', { pageKey }, function()
-        NotifyPlayer(src, _U('madeChanges'), 'success')
-    end)
+    local pageRow = MySQL.single.await('SELECT `revision` FROM `newspaper_texts` WHERE `page` = ? LIMIT 1', { pageKey })
+    local newRev = pageRow and ((pageRow.revision or 1) + 1) or 2
+    MySQL.query.await('UPDATE `newspaper_texts` SET `general` = \'[]\', `revision` = ? WHERE `page` = ?', { newRev, pageKey })
+    TriggerClientEvent('clen:updateRevision', src, pageNum, newRev)
+    NotifyPlayer(src, _U('madeChanges'), 'success')
 end)
 
 -- ==========================================================
@@ -262,6 +304,17 @@ RegisterNetEvent('changePage', function(pageNum)
             else
                 TriggerClientEvent('clen:changePageView', src, data[1].general)
             end
+        end
+    end)
+end)
+
+RegisterNetEvent('changePageView', function(pageNum)
+    local src = source
+    if not pageNum then return end
+    local pageKey = 'page' .. tostring(pageNum)
+    GetNewspaperPage(pageKey, function(data)
+        if data and data[1] then
+            TriggerClientEvent('clen:changePageView', src, data[1].general)
         end
     end)
 end)

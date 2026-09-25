@@ -13,6 +13,8 @@ Security.Distances = {
     GARAGE_SPAWN = 3.5,
     GARAGE_RETURN = 4.5,
     MANAGEMENT = 2.0,
+    WALL_POSTER = 3.5,
+    SPEAKER_VEHICLE = 5.0,
 }
 
 -- Configuração de Rate Limiting por Tier

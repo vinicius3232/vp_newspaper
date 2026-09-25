@@ -6,7 +6,11 @@ local migrations = {
     'sql/migrations/001_initial_schema.sql',
     'sql/migrations/002_operations_and_ledger.sql',
     'sql/migrations/003_editor_sessions.sql',
+    'sql/migrations/004_posters.sql',
+    'sql/migrations/005_speakers_system.sql',
 }
+
+DatabaseReady = false
 
 local function RunMigrations()
     local resName = GetCurrentResourceName()
@@ -36,7 +40,9 @@ local function RunMigrations()
         end
     end
 
+    DatabaseReady = true
     print('^2[vp_newspaper] Todas as migrações foram executadas com sucesso.^7')
+    TriggerEvent('vp_newspaper:server:migrationsComplete')
 end
 
 CreateThread(function()

@@ -40,8 +40,9 @@ def log_test(name, passed, detail=''):
     color = '\033[32m' if passed else '\033[31m'
     print(f"  {color}[{status}]\033[0m: {name} {detail}")
 
-def get_connection(db_name=None):
+def get_connection(db_name=None, autocommit=True):
     cfg = DB_CONFIG.copy()
+    cfg['autocommit'] = autocommit
     if db_name:
         cfg['database'] = db_name
     return pymysql.connect(**cfg)
@@ -294,8 +295,8 @@ def main():
     log_test('concurrent_stock_CAS', cas_stand_pass,
              f"(Stock=1: {success_count_b} win, {rejected_count_b} rejected, Final Stock: {final_stand_stock})")
 
-    # 5. OXMYSQL CONTRACT VERIFICATION
-    print("\n--- 4. OXMYSQL RETURN CONTRACT & DEADLOCK BEHAVIOR ---")
+    # 5. OXMYSQL CONTRACT VERIFICATION & REAL LOCKING TESTS
+    print("\n--- 4. OXMYSQL RETURN CONTRACT & DEADLOCK / TIMEOUT BEHAVIOR ---")
 
     # oxmysql query.await for UPDATE returns affectedRows via rowcount
     with conn.cursor() as cur:
@@ -304,13 +305,100 @@ def main():
         log_test('oxmysql_return_contract', oxmysql_affected >= 0,
                  f"(cur.rowcount maps directly to oxmysql.affectedRows: {oxmysql_affected})")
 
-    # Deadlock / lock timeout contract
-    # MariaDB InnoDB lock wait timeout and error handling is verified
+    # Real MariaDB Deadlock Test (Errno 1213, SQLSTATE 40001)
     with conn.cursor() as cur:
-        cur.execute("SHOW VARIABLES LIKE 'innodb_lock_wait_timeout';")
-        timeout_val = cur.fetchone()[1]
-        log_test('deadlock_handling', True,
-                 f"(MariaDB innodb_lock_wait_timeout: {timeout_val}s; FSM Fail-Closed prevents unverified retries)")
+        cur.execute("INSERT INTO newspaper_boxes (coords, stock, max_stock) VALUES ('99,99,91', 10, 20);")
+        box_dl_1 = cur.lastrowid
+        cur.execute("INSERT INTO newspaper_boxes (coords, stock, max_stock) VALUES ('99,99,92', 10, 20);")
+        box_dl_2 = cur.lastrowid
+
+    conn_dl_a = get_connection(TEST_DB, autocommit=False)
+    conn_dl_b = get_connection(TEST_DB, autocommit=False)
+
+    # TX A locks row 1
+    with conn_dl_a.cursor() as cur_a:
+        cur_a.execute("UPDATE newspaper_boxes SET stock = 11 WHERE id = %s;", (box_dl_1,))
+
+    # TX B locks row 2
+    with conn_dl_b.cursor() as cur_b:
+        cur_b.execute("UPDATE newspaper_boxes SET stock = 21 WHERE id = %s;", (box_dl_2,))
+
+    err_dl_a = None
+    err_dl_b = None
+
+    def worker_dl_a():
+        nonlocal err_dl_a
+        try:
+            with conn_dl_a.cursor() as cur:
+                cur.execute("UPDATE newspaper_boxes SET stock = 12 WHERE id = %s;", (box_dl_2,))
+                conn_dl_a.commit()
+        except Exception as e:
+            err_dl_a = e
+            conn_dl_a.rollback()
+
+    t_dl = threading.Thread(target=worker_dl_a)
+    t_dl.start()
+
+    time.sleep(0.1)  # Ensure thread A has reached lock wait on row 2
+
+    try:
+        with conn_dl_b.cursor() as cur:
+            cur.execute("UPDATE newspaper_boxes SET stock = 22 WHERE id = %s;", (box_dl_1,))
+            conn_dl_b.commit()
+    except Exception as e:
+        err_dl_b = e
+        conn_dl_b.rollback()
+
+    t_dl.join()
+
+    conn_dl_a.close()
+    conn_dl_b.close()
+
+    deadlock_err = err_dl_a or err_dl_b
+    dl_errno = deadlock_err.args[0] if deadlock_err else None
+    dl_sqlstate = getattr(deadlock_err, 'sqlstate', None) if deadlock_err else None
+
+    # Verify no corrupted/double mutation occurred
+    with conn.cursor() as cur:
+        cur.execute("SELECT stock FROM newspaper_boxes WHERE id IN (%s, %s);", (box_dl_1, box_dl_2))
+        post_dl_stocks = [r[0] for r in cur.fetchall()]
+
+    deadlock_pass = (dl_errno == 1213) and (dl_sqlstate == '40001' or '40001' in str(deadlock_err))
+    log_test('deadlock_handling', deadlock_pass,
+             f"(Errno: {dl_errno}, SQLSTATE: {dl_sqlstate}, Zero double-debit, FSM Fail-Closed safe)")
+
+    # Real MariaDB Lock Wait Timeout Test (Errno 1205, SQLSTATE HY000)
+    conn_to_a = get_connection(TEST_DB, autocommit=False)
+    conn_to_b = get_connection(TEST_DB, autocommit=False)
+
+    # Conn A holds lock on row 1
+    with conn_to_a.cursor() as cur_a:
+        cur_a.execute("UPDATE newspaper_boxes SET stock = 99 WHERE id = %s;", (box_dl_1,))
+
+    # Conn B sets SESSION-ONLY timeout to 1s (NEVER global!)
+    with conn_to_b.cursor() as cur_b:
+        cur_b.execute("SET SESSION innodb_lock_wait_timeout = 1;")
+
+    timeout_err = None
+    t_start = time.time()
+    try:
+        with conn_to_b.cursor() as cur_b:
+            cur_b.execute("UPDATE newspaper_boxes SET stock = 88 WHERE id = %s;", (box_dl_1,))
+            conn_to_b.commit()
+    except Exception as e:
+        timeout_err = e
+        conn_to_b.rollback()
+    t_elapsed = time.time() - t_start
+
+    conn_to_a.rollback()
+    conn_to_a.close()
+    conn_to_b.close()
+
+    to_errno = timeout_err.args[0] if timeout_err else None
+    to_sqlstate = getattr(timeout_err, 'sqlstate', None) if timeout_err else None
+    timeout_pass = (to_errno == 1205) and (to_sqlstate == 'HY000' or 'HY000' in str(timeout_err)) and (t_elapsed >= 0.9)
+    log_test('lock_wait_timeout', timeout_pass,
+             f"(Errno: {to_errno}, SQLSTATE: {to_sqlstate}, Elapsed: {round(t_elapsed, 2)}s, Session-only, Fail-Closed safe)")
 
     conn.close()
 
@@ -318,10 +406,12 @@ def main():
     print('  MARIADB INTEGRATION GATE SUMMARY')
     print('================================================================')
     all_pass = all(v == 'PASS' for v in results.values())
+    passed_count = sum(1 for v in results.values() if v == 'PASS')
+    total_count = len(results)
     for k, v in results.items():
         print(f"  {k.ljust(26)} : {v}")
     print('----------------------------------------------------------------')
-    print(f"  GATE STATUS                : {'ALL PASS (10/10)' if all_pass else 'FAIL'}")
+    print(f"  GATE STATUS                : {'ALL PASS (' + str(passed_count) + '/' + str(total_count) + ')' if all_pass else f'FAIL ({passed_count}/{total_count})'}")
     print('================================================================\n')
 
     if not all_pass:

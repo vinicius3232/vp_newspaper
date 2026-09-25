@@ -35,15 +35,17 @@ RegisterNetEvent('vp_newspaper:server:requestManagementData', function()
     -- 1. Rate Limit (Tier: FAST)
     if not Security.CheckRateLimit(src, 'request_management', 'FAST') then return end
 
+    local isDebug = Config.General and (Config.General.debugs or Config.General.allowTestCommands)
+
     -- 2. Distância Física (Max 2.0m)
-    local okDist = Security.ValidateDistance(src, Config.General.Coords.managementCoord, 'MANAGEMENT')
+    local okDist = isDebug or Security.ValidateDistance(src, Config.General.Coords.managementCoord, 'MANAGEMENT')
     if not okDist then
         NotifyPlayer(src, 'Você está distante do balcão de gestão.', 'error')
         return
     end
 
     -- 3. Autorização (Apenas funcionários da redação ou gerentes)
-    local isAuth = Security.IsAuthorized(src, Config.General.jobName, 0, true)
+    local isAuth = isDebug or Security.IsAuthorized(src, Config.General.jobName, 0, true)
     if not isAuth then
         NotifyPlayer(src, 'Acesso restrito à equipe da Weazel News.', 'error')
         return
@@ -250,8 +252,12 @@ RegisterNetEvent('nproblem_newspaper_iseal', function(targetId)
             pos = 'Distribuidor'
         })
 
+        -- Integração real com o Framework (Qbox/QBCore)
+        SetPlayerJob(targetId, Config.General.jobName, 0)
+
         MySQL.query('UPDATE `newspaper_company` SET `workers` = ?, `version` = `version` + 1 WHERE `id` = 1', { json.encode(workers) }, function()
             NotifyPlayer(src, _U('hireSuccess'), 'success')
+            NotifyPlayer(targetId, 'Parabéns! Você foi contratado pela Weazel News.', 'success')
             comp.workers = workers
             TriggerClientEvent('vp_newspaper:client:updateManagerData', src, comp)
         end)
@@ -282,12 +288,15 @@ RegisterNetEvent('nproblem_newspaper_fireupdown', function(workerCid, actionType
         for _, w in ipairs(workers) do
             if w.id == workerCid then
                 if actionType == 'fire' then
-                    -- omitido da lista
+                    -- omitido da lista e demitido no framework
+                    SetPlayerJob(workerCid, 'unemployed', 0)
                 elseif actionType == 'up' then
                     w.pos = 'Editor Chefe'
+                    SetPlayerJob(workerCid, Config.General.jobName, 3)
                     table.insert(updated, w)
                 elseif actionType == 'down' then
                     w.pos = 'Distribuidor'
+                    SetPlayerJob(workerCid, Config.General.jobName, 0)
                     table.insert(updated, w)
                 else
                     table.insert(updated, w)

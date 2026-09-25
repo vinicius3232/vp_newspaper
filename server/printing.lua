@@ -156,3 +156,150 @@ RegisterNetEvent('vp_newspaper:server:printNewspapers', function()
     local pName = player.PlayerData.charinfo.firstname .. ' ' .. player.PlayerData.charinfo.lastname
     SendDiscordLog('Tiragem de Jornais Impressa', ('O repórter **%s** imprimiu uma caixa de jornais para distribuição.'):format(pName), 1752220)
 end)
+
+-- Imprimir exemplar individual de leitura (1 folha de papel = 1 jornal legível)
+RegisterNetEvent('vp_newspaper:server:printSingleNewspaper', function()
+    local src = source
+    local player = GetPlayer(src)
+    if not player then return end
+
+    if not Security.CheckRateLimit(src, 'print_single_newspaper', 'FAST') then
+        NotifyPlayer(src, 'Aguarde um instante antes de imprimir novamente.', 'error')
+        return
+    end
+
+    local isDebug = Config.General and (Config.General.debugs or Config.General.allowTestCommands)
+    local isAuth = isDebug or Security.IsAuthorized(src, Config.General.jobName, 0, true)
+    if not isAuth then
+        NotifyPlayer(src, 'Apenas membros da equipe jornalística podem operar a impressora!', 'error')
+        return
+    end
+
+    local okDist = isDebug or Security.ValidateDistance(src, Config.General.Coords.printerCoord, 'PRINTING')
+    if not okDist then
+        NotifyPlayer(src, 'Você está distante da impressora.', 'error')
+        return
+    end
+
+    local paperItem = Config.General.emptyNewpsaperItemName or 'empty_newspaper'
+    local newspaperItem = Config.General.newspaperItemName or 'newspaper'
+
+    local hasPaper = false
+    if Config.UseOxInventory and GetResourceState('ox_inventory') == 'started' then
+        local count = exports.ox_inventory:GetItemCount(src, paperItem)
+        hasPaper = (count and count >= 1)
+    elseif QBCore then
+        local item = player.Functions.GetItemByName(paperItem)
+        hasPaper = (item and item.amount and item.amount >= 1)
+    end
+
+    if not hasPaper then
+        NotifyPlayer(src, _U('noItemErrorPrinter'), 'error')
+        return
+    end
+
+    local removed = false
+    if Config.UseOxInventory and GetResourceState('ox_inventory') == 'started' then
+        removed = exports.ox_inventory:RemoveItem(src, paperItem, 1)
+    elseif QBCore then
+        removed = player.Functions.RemoveItem(paperItem, 1)
+        if removed then
+            TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[paperItem], 'remove')
+        end
+    end
+
+    if not removed then
+        NotifyPlayer(src, _U('noItemErrorPrinter'), 'error')
+        return
+    end
+
+    local serial = Operations.GenerateUUID()
+    local added = false
+    if Config.UseOxInventory and GetResourceState('ox_inventory') == 'started' then
+        added = exports.ox_inventory:AddItem(src, newspaperItem, 1, { serial = serial, date = os.date('%d/%m/%Y') })
+    elseif QBCore then
+        added = player.Functions.AddItem(newspaperItem, 1, false, { serial = serial, date = os.date('%d/%m/%Y') })
+        if added then
+            TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[newspaperItem], 'add')
+        end
+    end
+
+    if not added then
+        if Config.UseOxInventory and GetResourceState('ox_inventory') == 'started' then
+            exports.ox_inventory:AddItem(src, paperItem, 1)
+        elseif QBCore then
+            player.Functions.AddItem(paperItem, 1)
+        end
+        NotifyPlayer(src, 'Inventário cheio para receber o jornal. A folha foi devolvida.', 'error')
+        return
+    end
+
+    NotifyPlayer(src, 'Exemplar impresso com sucesso! Use o jornal no inventário para ler.', 'success')
+end)
+
+-- Desempacotar caixa de jornais em 5 exemplares individuais de leitura
+RegisterNetEvent('vp_newspaper:server:unpackNewspaperBox', function()
+    local src = source
+    local player = GetPlayer(src)
+    if not player then return end
+
+    if not Security.CheckRateLimit(src, 'unpack_box', 'FAST') then
+        NotifyPlayer(src, 'Aguarde um momento.', 'error')
+        return
+    end
+
+    local boxItem = Config.General.restockBoxesItemName or 'newspaperbox'
+    local newspaperItem = Config.General.newspaperItemName or 'newspaper'
+
+    local hasBox = false
+    if Config.UseOxInventory and GetResourceState('ox_inventory') == 'started' then
+        local count = exports.ox_inventory:GetItemCount(src, boxItem)
+        hasBox = (count and count >= 1)
+    elseif QBCore then
+        local item = player.Functions.GetItemByName(boxItem)
+        hasBox = (item and item.amount and item.amount >= 1)
+    end
+
+    if not hasBox then
+        NotifyPlayer(src, 'Você não possui uma caixa de jornais para abrir!', 'error')
+        return
+    end
+
+    local removed = false
+    if Config.UseOxInventory and GetResourceState('ox_inventory') == 'started' then
+        removed = exports.ox_inventory:RemoveItem(src, boxItem, 1)
+    elseif QBCore then
+        removed = player.Functions.RemoveItem(boxItem, 1)
+        if removed then
+            TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[boxItem], 'remove')
+        end
+    end
+
+    if not removed then
+        NotifyPlayer(src, 'Não foi possível abrir a caixa.', 'error')
+        return
+    end
+
+    local countGiven = 5
+    local added = false
+    if Config.UseOxInventory and GetResourceState('ox_inventory') == 'started' then
+        added = exports.ox_inventory:AddItem(src, newspaperItem, countGiven)
+    elseif QBCore then
+        added = player.Functions.AddItem(newspaperItem, countGiven)
+        if added then
+            TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[newspaperItem], 'add')
+        end
+    end
+
+    if not added then
+        if Config.UseOxInventory and GetResourceState('ox_inventory') == 'started' then
+            exports.ox_inventory:AddItem(src, boxItem, 1)
+        elseif QBCore then
+            player.Functions.AddItem(boxItem, 1)
+        end
+        NotifyPlayer(src, 'Inventário sem espaço suficiente para 5 jornais. A caixa foi mantida.', 'error')
+        return
+    end
+
+    NotifyPlayer(src, 'Você abriu a caixa e extraiu 5 jornais impressos prontos para leitura!', 'success')
+end)

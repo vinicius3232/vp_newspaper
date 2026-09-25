@@ -1,180 +1,401 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weazel News — Imprensa &amp; Jornalismo</title>
     <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <!-- jQuery -->
-    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
-    <!-- jQuery UI -->
-    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
-    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/smoothness/jquery-ui.css">
-    <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.1.1/howler.min.js" type="text/javascript"></script>
-    <title>News Layout</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Local Libraries (100% Offline e Sem Falhas de Rede) -->
+    <script src="jquery.min.js"></script>
+    <script src="jquery-ui.min.js"></script>
+    <script src="howler.min.js"></script>
 </head>
 <body>
+    <!-- ─── CONTAINER PRINCIPAL (LEITOR & EDITOR) ───────────────────── -->
     <div class="container" style="display: none;">
-    
-        <div class="page"></div>
+        <!-- Folha Impressa do Jornal -->
+        <div class="page-container">
+            <div class="page"></div>
 
-        <div class="controlPage">
-            <span style="color: rgba(255, 255, 255, 0.7);"><span id="currentPageText">Current Page</span> <span id="currentPageNumber">1</span></span>
-            <div style="width: 100%;">
-                <button id="previousPage" style="width: 49%;">Previous Page</button>
-                <button id="nextPage"  style="width: 49%;">Next Page</button>
+            <!-- Barra Flutuante de Leitura (Estilo Lation UI) -->
+            <div class="reader-toolbar" id="readerToolbar" style="display: none;">
+                <button type="button" id="readerPrevPage" class="reader-nav-btn" title="Página Anterior (← ou A)">
+                    <i class="fas fa-chevron-left"></i> <span>Anterior</span>
+                </button>
+                <div class="reader-info-pill">
+                    <span class="reader-brand-pill"><i class="fas fa-newspaper"></i> WEAZEL NEWS</span>
+                    <span class="reader-page-counter">Página <b id="readerPageNumber">1</b> de <b id="readerTotalPages">5</b></span>
+                </div>
+                <button type="button" id="readerNextPage" class="reader-nav-btn" title="Próxima Página (→ ou D)">
+                    <span>Próxima</span> <i class="fas fa-chevron-right"></i>
+                </button>
+                <div class="reader-nav-sep"></div>
+                <button type="button" id="readerCloseBtn" class="reader-close-action" title="Fechar Jornal (ESC)">
+                    <i class="fas fa-xmark"></i> <span>Fechar</span>
+                </button>
             </div>
-            <span id="generalOptionsText" style="color: white; font-family: Montserrat, sans-serif; font-size: 15px;">General Options:</span>
-            <input type="number" id="elementOpactiy" placeholder="Set Opacity (1-10)" min="1" max="10" step="1">
-            <span id="textOptions" style="color: white; font-family: Montserrat, sans-serif; font-size: 15px;">Text Options:</span>
-            <input type="number" id="textSpace" placeholder="Add Letter Spacing (1-10)" min="1" max="10" step="1">
-            <input type="number" id="textWeight" placeholder="Change Font Weight (1-10)" min="1" max="10" step="1">
-            <!-- <input type="number" id="textWidth" placeholder="Text Width (1-5)" min="1" max="5" step="1"> -->
-            <input type="color" id="colorPicker" value="#000000">
-            <input type="number" id="sizeInput" placeholder="Enter Size (1-50)" min="1" max="50" step="1">
-            <div style="width: 100%; display: flex; justify-content: space-between;">
-                <button id="textLeft" style="width: 30%;" disabled>Left</button>
-                <button id="textCenter" style="width: 30%;" disabled>Center</button>
-                <button id="textRight" style="width: 30%;" disabled>Right</button>
-            </div>  
-            <div id="fontPicker" class="custom-dropdown">
-                <div class="selected333">Change Text Font</div>
-                <ul class="dropdown-list">
-                    <li data-font="Montserrat">Montserrat</li>
-                    <li data-font="Courier New">Courier New</li>
-                    <li data-font="Times New Roman">Times New Roman</li>
-                    <li data-font="Georgia">Georgia</li>
-                    <li data-font="Garamond">Garamond</li>
-                    <li data-font="Merriweather">Merriweather</li>
-                    <li data-font="Baskerville">Baskerville</li>
-                    <li data-font="Playfair Display">Playfair Display</li>
-                </ul>                
-            </div> 
-            <!-- <input id="textInput" placeholder="Change Text"> -->
-            <button id="addText">Add Text</button>
-        
-            <span id="imageOptions" style="color: white; font-family: Montserrat, sans-serif; font-size: 15px;">Image Options:</span>
-            <input type="text" id="imageInput" placeholder="Enter image URL">
-            <input type="number" id="imageWidth" placeholder="Image Width (1-60)">
-            <input type="number" id="imageHeight" placeholder="Image Height (1-60)">
-            <button id="addImage">Add Image</button>
+        </div>
 
-            
+        <!-- Painel Lateral de Controle (Modo Editor WYSIWYG) -->
+        <div class="controlPage">
+            <div class="control-header">
+                <span class="control-title"><i class="fas fa-newspaper"></i> Redação Weazel News</span>
+                <span class="page-badge">Página <span id="currentPageNumber">1</span></span>
+            </div>
+
+            <div class="page-nav-group">
+                <button id="previousPage" class="btn-sub"><i class="fas fa-arrow-left"></i> Anterior</button>
+                <button id="nextPage" class="btn-sub">Próxima <i class="fas fa-arrow-right"></i></button>
+            </div>
+
+            <!-- Abas de Navegação do Editor -->
+            <div class="editor-tabs">
+                <button type="button" class="editor-tab-btn active" data-tab="tab-text"><i class="fas fa-font"></i> Texto</button>
+                <button type="button" class="editor-tab-btn" data-tab="tab-media"><i class="fas fa-camera"></i> Imagem</button>
+                <button type="button" class="editor-tab-btn" data-tab="tab-shapes"><i class="fas fa-shapes"></i> Formas</button>
+                <button type="button" class="editor-tab-btn" data-tab="tab-page"><i class="fas fa-file-alt"></i> Folha</button>
+            </div>
+
+            <!-- ── ABA 1: TIPOGRAFIA & TEXTOS ── -->
+            <div id="tab-text" class="editor-tab-content active">
+                <div class="control-section">
+                    <span class="section-title"><i class="fas fa-plus"></i> Inserir Texto</span>
+                    <button id="addText" class="btn-primary"><i class="fas fa-plus-circle"></i> Adicionar Texto Livre</button>
+
+                    <span class="sub-label">Modelos Rápidos (1-Clique):</span>
+                    <div class="preset-grid">
+                        <button type="button" class="btn-preset" data-preset="headline"><i class="fas fa-heading"></i> Manchete</button>
+                        <button type="button" class="btn-preset" data-preset="subheadline"><i class="fas fa-heading"></i> Subtítulo</button>
+                        <button type="button" class="btn-preset" data-preset="body"><i class="fas fa-paragraph"></i> Coluna</button>
+                        <button type="button" class="btn-preset" data-preset="quote"><i class="fas fa-quote-left"></i> Citação</button>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <span class="section-title"><i class="fas fa-pen-nib"></i> Tipografia &amp; Formatação</span>
+                    <div id="fontPicker" class="custom-dropdown">
+                        <div class="selected333"><i class="fas fa-pen-fancy"></i> Selecionar Fonte</div>
+                        <ul class="dropdown-list">
+                            <li data-font="Playfair Display" style="font-family: 'Playfair Display';">Playfair Display (Manchete Clássica)</li>
+                            <li data-font="Bebas Neue" style="font-family: 'Bebas Neue';">Bebas Neue (Tabloide Impacto)</li>
+                            <li data-font="Cinzel" style="font-family: 'Cinzel';">Cinzel (Revista Luxo)</li>
+                            <li data-font="Oswald" style="font-family: 'Oswald';">Oswald (Jornal Moderno)</li>
+                            <li data-font="Merriweather" style="font-family: 'Merriweather';">Merriweather (Editorial)</li>
+                            <li data-font="Times New Roman" style="font-family: 'Times New Roman';">Times New Roman (Clássica)</li>
+                            <li data-font="Georgia" style="font-family: 'Georgia';">Georgia (Notícias)</li>
+                            <li data-font="Garamond" style="font-family: 'Garamond';">Garamond (Elegante)</li>
+                            <li data-font="Courier New" style="font-family: 'Courier New';">Courier New (Máquina)</li>
+                            <li data-font="Montserrat" style="font-family: 'Montserrat';">Montserrat (Moderna Clean)</li>
+                        </ul>
+                    </div>
+
+                    <!-- Botoeiras de Estilo (Negrito, Itálico, Sublinhado, Caixa Alta) -->
+                    <div class="format-buttons-group">
+                        <button type="button" id="btnBold" title="Negrito"><i class="fas fa-bold"></i></button>
+                        <button type="button" id="btnItalic" title="Itálico"><i class="fas fa-italic"></i></button>
+                        <button type="button" id="btnUnderline" title="Sublinhado"><i class="fas fa-underline"></i></button>
+                        <button type="button" id="btnUppercase" title="Caixa Alta"><i class="fas fa-font"></i>T</button>
+                    </div>
+
+                    <!-- Alinhamento de Texto -->
+                    <div class="align-group">
+                        <button type="button" id="textLeft" title="Alinhar à Esquerda"><i class="fas fa-align-left"></i></button>
+                        <button type="button" id="textCenter" title="Centralizar"><i class="fas fa-align-center"></i></button>
+                        <button type="button" id="textRight" title="Alinhar à Direita"><i class="fas fa-align-right"></i></button>
+                        <button type="button" id="textJustify" title="Justificado"><i class="fas fa-align-justify"></i></button>
+                    </div>
+
+                    <div class="input-grid">
+                        <div>
+                            <label>Tamanho (px):</label>
+                            <input type="number" id="sizeInput" placeholder="10-72" min="10" max="72" step="1" value="18">
+                        </div>
+                        <div>
+                            <label>Espaçamento:</label>
+                            <input type="number" id="textSpace" placeholder="0-10" min="0" max="10" step="1" value="0">
+                        </div>
+                    </div>
+
+                    <div class="input-grid">
+                        <div>
+                            <label>Cor do Texto:</label>
+                            <input type="color" id="colorPicker" value="#111111">
+                        </div>
+                        <div>
+                            <label>Fundo / Tarja:</label>
+                            <div class="color-with-reset">
+                                <input type="color" id="textBgColor" value="#ffeb3b">
+                                <button type="button" id="btnTextBgNone" class="btn-mini" title="Remover Fundo"><i class="fas fa-ban"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── ABA 2: FOTOGRAFIAS & IMAGENS ── -->
+            <div id="tab-media" class="editor-tab-content">
+                <div class="control-section">
+                    <span class="section-title"><i class="fas fa-camera"></i> Inserir Fotografia</span>
+                    <input type="text" id="imageInput" placeholder="URL da Foto (Discord, Imgur, Web)">
+                    <p class="tool-tip-msg"><i class="fas fa-mouse-pointer"></i> <b>Dica:</b> Você pode redimensionar a imagem puxando as bordas e cantos com o mouse na folha!</p>
+                    <div class="input-grid">
+                        <div>
+                            <label>Largura (px):</label>
+                            <input type="number" id="imageWidth" placeholder="100-700" value="300">
+                        </div>
+                        <div>
+                            <label>Altura (px):</label>
+                            <input type="number" id="imageHeight" placeholder="50-900" value="200">
+                        </div>
+                    </div>
+                    <button type="button" id="addImage" class="btn-secondary"><i class="fas fa-image"></i> Inserir Fotografia</button>
+                </div>
+
+                <div class="control-section">
+                    <span class="section-title"><i class="fas fa-crop-alt"></i> Estilo da Foto Selecionada</span>
+                    <span class="sub-label">Cantos da Foto:</span>
+                    <div class="btn-group-row">
+                        <button type="button" id="btnRadius0" class="btn-opt active" data-radius="0px">Retos</button>
+                        <button type="button" id="btnRadius8" class="btn-opt" data-radius="8px">Suaves</button>
+                        <button type="button" id="btnRadiusRound" class="btn-opt" data-radius="50%">Redondo</button>
+                    </div>
+
+                    <span class="sub-label" style="margin-top: 6px;">Moldura / Borda:</span>
+                    <div class="btn-group-row">
+                        <button type="button" id="btnBorderNone" class="btn-opt active" data-border="none">Sem Borda</button>
+                        <button type="button" id="btnBorderThin" class="btn-opt" data-border="1px solid #111">Fina</button>
+                        <button type="button" id="btnBorderPolaroid" class="btn-opt" data-border="5px solid #fff">Polaróide</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── ABA 3: FORMAS, LINHAS & SELOS ── -->
+            <div id="tab-shapes" class="editor-tab-content">
+                <div class="control-section">
+                    <span class="section-title"><i class="fas fa-grip-lines"></i> Linhas Divisórias</span>
+                    <div class="btn-group-row">
+                        <button type="button" id="addHLine" class="btn-secondary"><i class="fas fa-minus"></i> Linha Horizontal</button>
+                        <button type="button" id="addVLine" class="btn-secondary"><i class="fas fa-grip-lines-vertical"></i> Linha Vertical</button>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <span class="section-title"><i class="fas fa-vector-square"></i> Caixas &amp; Blocos</span>
+                    <button type="button" id="addBox" class="btn-secondary"><i class="fas fa-square"></i> Inserir Caixa de Destaque</button>
+                    <div class="input-grid" style="margin-top: 6px;">
+                        <div>
+                            <label>Cor de Fundo:</label>
+                            <input type="color" id="boxBgColor" value="#ffffff">
+                        </div>
+                        <div>
+                            <label>Cor da Borda:</label>
+                            <input type="color" id="boxBorderColor" value="#000000">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <span class="section-title"><i class="fas fa-stamp"></i> Selos Editoriais Prontos</span>
+                    <div class="badges-grid">
+                        <button type="button" class="btn-badge badge-urgente" data-badge="URGENTE"><i class="fas fa-exclamation-triangle"></i> URGENTE</button>
+                        <button type="button" class="btn-badge badge-exclusivo" data-badge="EXCLUSIVO"><i class="fas fa-star"></i> EXCLUSIVO</button>
+                        <button type="button" class="btn-badge badge-policial" data-badge="POLICIAL"><i class="fas fa-shield-alt"></i> POLICIAL</button>
+                        <button type="button" class="btn-badge badge-plantao" data-badge="PLANTÃO"><i class="fas fa-bolt"></i> PLANTÃO</button>
+                        <button type="button" class="btn-badge badge-opiniao" data-badge="OPINIÃO"><i class="fas fa-comment-dots"></i> OPINIÃO</button>
+                        <button type="button" class="btn-badge badge-classificados" data-badge="CLASSIFICADOS"><i class="fas fa-tags"></i> CLASSIFICADOS</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── ABA 4: TEMA & ESTILO DA FOLHA ── -->
+            <div id="tab-page" class="editor-tab-content">
+                <div class="control-section">
+                    <span class="section-title"><i class="fas fa-palette"></i> Tipo de Publicação</span>
+                    <span class="sub-label">Escolha o formato do papel:</span>
+                    <div class="theme-picker-grid">
+                        <button type="button" class="btn-theme active" data-theme="newspaper">
+                            <i class="fas fa-newspaper"></i>
+                            <span>Jornal Clássico</span>
+                        </button>
+                        <button type="button" class="btn-theme" data-theme="magazine-clean">
+                            <i class="fas fa-book-open"></i>
+                            <span>Revista Clean</span>
+                        </button>
+                        <button type="button" class="btn-theme" data-theme="magazine-dark">
+                            <i class="fas fa-moon"></i>
+                            <span>Revista Dark</span>
+                        </button>
+                        <button type="button" class="btn-theme" data-theme="vintage">
+                            <i class="fas fa-scroll"></i>
+                            <span>Papel Kraft</span>
+                        </button>
+                    </div>
+
+                    <div style="margin-top: 10px;">
+                        <label class="sub-label">Ou Cor de Fundo Personalizada:</label>
+                        <div class="color-with-reset">
+                            <input type="color" id="pageCustomBg" value="#f7f3e8">
+                            <button type="button" id="btnResetPageBg" class="btn-mini" title="Restaurar Padrão"><i class="fas fa-undo"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── SEÇÃO FIXA: CAMADAS, ROTAÇÃO & ELEMENTO SELECIONADO ── -->
+            <div class="control-section selected-element-panel">
+                <span class="section-title"><i class="fas fa-sliders-h"></i> Ajustes do Elemento</span>
+
+                <!-- Camadas (Z-Index) -->
+                <div class="layers-group">
+                    <label>Camada:</label>
+                    <div class="btn-group-row">
+                        <button type="button" id="layerUp" class="btn-sub" title="Trazer para Frente" disabled><i class="fas fa-arrow-up"></i> Frente</button>
+                        <button type="button" id="layerDown" class="btn-sub" title="Enviar para Trás" disabled><i class="fas fa-arrow-down"></i> Trás</button>
+                        <button type="button" id="duplicateButton" class="btn-sub" title="Duplicar Elemento" disabled><i class="fas fa-clone"></i> Duplicar</button>
+                    </div>
+                </div>
+
+                <!-- Rotação -->
+                <div class="input-grid">
+                    <div>
+                        <label>Rotação: <span id="rotateValue">0°</span></label>
+                        <input type="range" id="elementRotate" min="-180" max="180" step="5" value="0" disabled>
+                    </div>
+                    <div style="max-width: 45px; display: flex; align-items: flex-end;">
+                        <button type="button" id="btnResetRotate" class="btn-sub" title="Zerar Rotação" style="padding: 6px;" disabled><i class="fas fa-redo-alt"></i></button>
+                    </div>
+                </div>
+
+                <!-- Opacidade -->
+                <div>
+                    <label>Opacidade: <span id="opacityValue">100%</span></label>
+                    <input type="range" id="elementOpactiy" min="1" max="10" step="1" value="10" disabled>
+                </div>
+            </div>
+
+            <div class="editor-hint">
+                <i class="fas fa-keyboard"></i> <span>Dica: Use <b>setas ↑ ↓ ← →</b> para ajuste fino de posição.</span>
+            </div>
+
+            <!-- Ações Finais -->
             <div class="annenqwe">
-                <button id="saveButton" disabled>Save</button>
-                <button id="deleteButton" disabled>Delete</button>
-                <button id="clearPageButton">Clear Page</button>
+                <button id="saveButton" class="btn-success"><i class="fas fa-save"></i> Salvar Página</button>
+                <button id="deleteButton" class="btn-danger" disabled><i class="fas fa-trash-alt"></i> Excluir Selecionado</button>
+                <button id="clearPageButton" class="btn-warning"><i class="fas fa-eraser"></i> Limpar Folha</button>
+                <button id="editorCloseBtn" class="btn-exit"><i class="fas fa-times"></i> Fechar Editor (ESC)</button>
             </div>
         </div>
     </div>
 
-    <div class="annneeen">
+    <!-- ─── PAINEL DE GESTÃO DA EMPRESA (DIRETORIA - ESTILO LATION UI) ─── -->
+    <div class="annneeen" style="display: none;">
         <div class="container31" style="display: none;">
             <aside class="sidebar">
-                <h1 class="shopName" id="shopName" style="color: white; font-family: Montserrat, sans-serif;">Management</h1>
-                <nav>
-                    <button class="nav-button active" id="dashboardButton" data-tab="dashboard">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg> 
-                        <span id="dashboardText">Dashboard</span>
+                <div class="sidebar-brand">
+                    <div class="brand-avatar"><i class="fas fa-newspaper"></i></div>
+                    <div class="brand-meta">
+                        <h1 id="shopName">WEAZEL NEWS</h1>
+                        <span class="brand-tag"><i class="fas fa-shield-halved"></i> Painel de Gestão</span>
+                    </div>
+                </div>
+                <nav class="sidebar-nav">
+                    <button class="nav-button active" data-tab="dashboard">
+                        <i class="fas fa-chart-pie"></i>
+                        <span>Painel Geral</span>
                     </button>
-                    <button class="nav-button" id="dashboardButton" data-tab="workers">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="8" r="4" />
-                            <path d="M12 12c4.418 0 8 2 8 6v2H4v-2c0-4 3.582-6 8-6z"/>
-                        </svg> 
-                        <span id="workerManagement">Worker Management</span>
+                    <button class="nav-button" data-tab="workers">
+                        <i class="fas fa-users-gear"></i>
+                        <span>Equipe &amp; Cargos</span>
                     </button>
-                    
-                    <button id="exit_button" class="nav-button" data-tab="exit" style="margin-bottom: 10vh;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
-                        <span id="exitText">Exit</span>
+                    <button id="exit_button" class="nav-button exit-btn" data-tab="exit">
+                        <i class="fas fa-arrow-right-from-bracket"></i>
+                        <span>Sair (ESC)</span>
                     </button>
                 </nav>
+                <div class="sidebar-footer">
+                    <span class="footer-status"><span class="status-dot"></span> 98.5 FM No Ar</span>
+                </div>
             </aside>
 
-            
             <main class="main-content">
+                <!-- Aba 1: Dashboard Financeiro -->
                 <div id="dashboard" class="tab-content active">
-                    <div style="display: flex; justify-content: space-between;">
-                        <h2 id="dashboardText">Dashboard</h2>
-                    </div>
-                    <div class="card">
+                    <div class="tab-header">
                         <div>
-                            <h4 class="input-text" id="newspaperPrice">Newspaper Price</h4>
-                            <input type="text" class="amount-input" id="workerTaxAmount" placeholder="Enter the price of the newspaper">
-                            <button class="button" id="setNewspaperPrice">Set Price</button>        
+                            <h2 class="tab-title">Visão Geral &amp; Cofre Corporativo</h2>
+                            <p class="tab-subtitle">Monitore finanças, ajuste tabelas de preços e acompanhe transações em tempo real</p>
                         </div>
                     </div>
-                    <div class="card">
-                        <h4 class="input-text" id="companyBalance">Company Balance</h4>
-                        <p class="balance">$<span id="cashBalance" style="font-family: Montserrat, sans-serif;">10000</span></p>
-                        <input type="number" id="balanceamount" class="amount-input" placeholder="Enter amount">
-                        <button class="button" id="addfunds">Add Funds</button>
-                        <button class="button" id="withdrawfunds">Withdraw Funds</button>
+
+                    <!-- Métricas / KPIs Principais (Lation Cards) -->
+                    <div class="kpi-grid">
+                        <div class="card kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Saldo do Cofre</span>
+                                <div class="kpi-icon emerald"><i class="fas fa-vault"></i></div>
+                            </div>
+                            <p class="balance">$<span id="cashBalance">10,000</span></p>
+                            <span class="kpi-sub"><i class="fas fa-circle-check"></i> Seguro e auditado com CAS</span>
+                            <div class="action-row" style="margin-top: 14px;">
+                                <input type="number" id="balanceamount" class="amount-input" placeholder="Valor ($)">
+                                <button class="button btn-deposit" id="addfunds"><i class="fas fa-arrow-down"></i> Depositar</button>
+                                <button class="button withdraw-btn" id="withdrawfunds"><i class="fas fa-arrow-up"></i> Sacar</button>
+                            </div>
+                        </div>
+
+                        <div class="card kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Preço por Exemplar</span>
+                                <div class="kpi-icon cyan"><i class="fas fa-tag"></i></div>
+                            </div>
+                            <p class="balance" id="newspaperPrice">Preço Atual</p>
+                            <span class="kpi-sub"><i class="fas fa-newspaper"></i> Valor cobrado nas bancas de rua</span>
+                            <div class="action-row" style="margin-top: 14px;">
+                                <input type="number" class="amount-input" id="workerTaxAmount" placeholder="Novo preço (1-50)" min="1" max="50">
+                                <button class="button btn-primary-action" id="setNewspaperPrice"><i class="fas fa-check"></i> Atualizar</button>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card">
-                        <h4 class="input-text" id="transactionHeader">Newspaper Sales and Transaction History</h4>
-                        <ul class="transasction-list" id="pastTransactions" style="max-height: 30vh;">
-                            <li>
-                                <span>- $4000</span>
-                                <span style="color: rgba(255, 0, 0, 1);">Withdraw</span>
-                            </li>
-                            <li>
-                                <span>+ $5000</span>
-                                <span style="color: rgba(100, 176, 108, 1);">Deposit</span>
-                            </li>
-                            <li>
-                                <span>+ $5000</span>
-                                <span style="color: rgba(100, 176, 108, 1);">Deposit</span>
-                            </li>
-                            <li>
-                                <span>+ $5000</span>
-                                <span style="color: rgba(100, 176, 108, 1);">Deposit</span>
-                            </li>
+
+                    <!-- Extrato de Transações -->
+                    <div class="card transaction-card" style="margin-top: 20px;">
+                        <div class="card-section-header">
+                            <h4 class="input-text"><i class="fas fa-receipt"></i> Extrato de Transações &amp; Vendas</h4>
+                            <span class="badge-pill">Ledger Imutável</span>
+                        </div>
+                        <ul class="transasction-list" id="pastTransactions">
+                            <!-- Inserido dinamicamente via script.js -->
                         </ul>
                     </div>
                 </div>
 
+                <!-- Aba 2: Gestão de Funcionários -->
                 <div id="workers" class="tab-content">
-                    <div style="display: flex; justify-content: space-between;">
-                        <h2 id="workerManagement">Worker Management</h2>
+                    <div class="tab-header">
+                        <div>
+                            <h2 class="tab-title">Gerenciamento da Equipe Editorial</h2>
+                            <p class="tab-subtitle">Controle de jornalistas, fotógrafos, operadores de rádio e distribuidores</p>
+                        </div>
                     </div>
-                    <div class="card">
-                        <h4 class="input-text" id="activeWorkers">Active Workers</h4>
-                        <ul class="worker-list" id="active_workers" style="max-height: 30vh;">
-                            <li style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                                <div>
-                                    <span style="font-size: 16px; font-weight: bold; color: rgba(255, 255, 255, 0.9);">Kane Leon</span>
-                                    <div style="font-size: 12px; color: rgba(255, 255, 255, 0.7);">
-                                        <span><span style="color: rgba(255, 255, 255, 1);">Working with your company since:</span> 17:14 24/01</span>
-                                        <br>
-                                        <span><span style="color: rgba(255, 255, 255, 1);">Company Position:</span> Editor</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <button class="button" style="margin-left: 10px;" disabled>Fire</button>
-                                    <button class="button" style="margin-left: 10px;" disabled>Rank Up</button>
-                                    <button class="button" style="margin-left: 10px;" disabled>Rank Down</button>
-                                </div>
-                            </li>
+
+                    <div class="card" style="margin-bottom: 20px;">
+                        <div class="card-section-header">
+                            <h4 class="input-text"><i class="fas fa-user-tie"></i> Jornalistas &amp; Distribuidores Ativos</h4>
+                            <span class="badge-pill">Equipe Oficial</span>
+                        </div>
+                        <ul class="worker-list" id="active_workers">
+                            <!-- Inserido dinamicamente via script.js -->
                         </ul>
                     </div>
+
                     <div class="card">
-                        <h4 class="input-text">Hire Worker</h4>
-                        <ul class="worker-list" id="hire_worker" style="max-height: 30vh;">
-                            <li style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                                <div>
-                                    <span style="font-size: 16px; font-weight: bold; color: rgba(255, 255, 255, 1);">Kane Leon</span>
-                                    <div style="font-size: 12px; color: rgba(255, 255, 255, 0.7);">
-                                        <span><span style="color: rgba(255, 255, 255, 1);">Position to be Hired:</span> Distribution</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <button class="button" id="hire_people" style="margin-left: 10px;">Hire</button>
-                                </div>
-                            </li>
+                        <div class="card-section-header">
+                            <h4 class="input-text"><i class="fas fa-user-plus"></i> Contratar Cidadãos Próximos</h4>
+                            <span class="badge-pill">Admissões</span>
+                        </div>
+                        <ul class="worker-list" id="hire_worker">
+                            <!-- Inserido dinamicamente via script.js -->
                         </ul>
                     </div>
                 </div>
@@ -182,6 +403,14 @@
         </div>
     </div>
 
+    <!-- ─── REPRODUTOR DE RÁDIO WEAZEL FM ──────────────────────────── -->
+    <div id="youtube-player-container" style="position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; opacity: 0.01; pointer-events: none; overflow: hidden;">
+        <div id="ytplayer"></div>
+    </div>
+    <audio id="html5-player" preload="auto"></audio>
+
     <script src="script.js"></script>
+    <script src="radio_audio.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

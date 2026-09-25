@@ -2,7 +2,7 @@
 -- vp_newspaper: Core Client, Zones, Garage & Management NUI
 -- ==========================================================
 
-local currentDeliveryVehicle = nil
+CurrentDeliveryVehicle = nil
 
 -- ==========================================================
 -- Sistema de Notificações Adaptativo
@@ -106,20 +106,57 @@ CreateThread(function()
             {
                 name = 'vp_newspaper_printer',
                 icon = 'fas fa-print',
-                label = 'Imprimir Tiragem de Jornais',
+                label = 'Operar Prensa Gráfica',
                 distance = 2.0,
                 groups = Config.General.jobName,
                 onSelect = function()
-                    if lib.progressBar({
-                        duration = 5000,
-                        label = _U('printingProgress'),
-                        useWhileDead = false,
-                        canCancel = true,
-                        disable = { car = true, move = true },
-                        anim = { dict = 'anim@amb@clubhouse@tutorial@bkr_tut_ig3@', clip = 'machinic_loop_mechandplayer' }
-                    }) then
-                        TriggerServerEvent('vp_newspaper:server:printNewspapers')
-                    end
+                    lib.registerContext({
+                        id = 'vp_newspaper_printer_menu',
+                        title = 'Prensa Gráfica Weazel News',
+                        options = {
+                            {
+                                title = 'Imprimir Exemplar para Leitura',
+                                description = 'Consome 1 folha de papel e entrega 1 jornal pronto para ler.',
+                                icon = 'newspaper',
+                                onSelect = function()
+                                    local ped = PlayerPedId()
+                                    TaskGoStraightToCoord(ped, -577.39, -938.04, 23.88, 1.0, 2000, 92.76, 0.2)
+                                    Wait(1500)
+                                    if lib.progressBar({
+                                        duration = 3500,
+                                        label = 'Imprimindo exemplar de leitura...',
+                                        useWhileDead = false,
+                                        canCancel = true,
+                                        disable = { car = true, move = true },
+                                        anim = { dict = 'anim@amb@clubhouse@tutorial@bkr_tut_ig3@', clip = 'machinic_loop_mechandplayer' }
+                                    }) then
+                                        TriggerServerEvent('vp_newspaper:server:printSingleNewspaper')
+                                    end
+                                end
+                            },
+                            {
+                                title = 'Imprimir Caixa de Jornais (Tiragem)',
+                                description = 'Consome 5 folhas de papel e gera 1 caixa para abastecer bancas.',
+                                icon = 'boxes-stacked',
+                                onSelect = function()
+                                    local ped = PlayerPedId()
+                                    TaskGoStraightToCoord(ped, -577.39, -938.04, 23.88, 1.0, 2000, 92.76, 0.2)
+                                    Wait(1500)
+                                    if lib.progressBar({
+                                        duration = 5000,
+                                        label = _U('printingProgress'),
+                                        useWhileDead = false,
+                                        canCancel = true,
+                                        disable = { car = true, move = true },
+                                        anim = { dict = 'anim@amb@clubhouse@tutorial@bkr_tut_ig3@', clip = 'machinic_loop_mechandplayer' }
+                                    }) then
+                                        TriggerServerEvent('vp_newspaper:server:printNewspapers')
+                                    end
+                                end
+                            }
+                        }
+                    })
+                    lib.showContext('vp_newspaper_printer_menu')
                 end
             }
         }
@@ -196,52 +233,81 @@ end)
 -- ==========================================================
 
 function SpawnDeliveryVehicle()
-    if currentDeliveryVehicle and DoesEntityExist(currentDeliveryVehicle) then
+    if CurrentDeliveryVehicle and DoesEntityExist(CurrentDeliveryVehicle) then
         TriggerEvent('vp_newspaper:client:notify', 'Você já retirou um veículo de entrega!', 'error')
         return
     end
 
-    local spawns = Config.General.distributorCoords
-    local chosenSpawn = spawns[1]
-
-    -- Encontra ponto livre
-    for _, sp in ipairs(spawns) do
-        if not IsAnyVehicleNearPoint(sp.x, sp.y, sp.z, 2.5) then
-            chosenSpawn = sp
-            break
+    local vehicles = Config.General.distributorVehicles or { 'rumpo' }
+    if #vehicles > 1 and GetResourceState('ox_lib') == 'started' then
+        local options = {}
+        for _, vModel in ipairs(vehicles) do
+            options[#options + 1] = {
+                title = string.upper(vModel),
+                description = 'Retirar veículo Weazel News',
+                icon = 'van-shuttle',
+                onSelect = function()
+                    TriggerServerEvent('vp_newspaper:server:spawnDeliveryVehicle', vModel)
+                end
+            }
         end
+        lib.registerContext({
+            id = 'vp_newspaper_vehicle_selector',
+            title = 'Frota de Distribuição',
+            options = options
+        })
+        lib.showContext('vp_newspaper_vehicle_selector')
+    else
+        TriggerServerEvent('vp_newspaper:server:spawnDeliveryVehicle', vehicles[1] or 'rumpo')
+    end
+end
+
+RegisterNetEvent('vp_newspaper:client:deliveryVehicleSpawned', function(netId, chosenModel)
+    local waitCount = 0
+    while not NetworkDoesNetworkIdExist(netId) and waitCount < 30 do
+        Wait(100)
+        waitCount = waitCount + 1
     end
 
-    local modelHash = joaat('rumpo')
-    lib.requestModel(modelHash)
+    local veh = NetToVeh(netId)
+    if DoesEntityExist(veh) then
+        CurrentDeliveryVehicle = veh
+        local livery = 4
+        if Config.General.distributorVehicleLiveries and chosenModel and Config.General.distributorVehicleLiveries[chosenModel] then
+            livery = Config.General.distributorVehicleLiveries[chosenModel]
+        end
+        SetVehicleLivery(veh, livery) -- Weazel News Livery
+        TaskWarpPedIntoVehicle(PlayerPedId(), veh, -1)
 
-    local veh = CreateVehicle(modelHash, chosenSpawn.x, chosenSpawn.y, chosenSpawn.z, chosenSpawn.w, true, false)
-    SetVehicleLivery(veh, 4) -- Weazel News Livery
-    SetVehicleNumberPlateText(veh, 'WEAZEL' .. tostring(math.random(10, 99)))
-    SetEntityAsMissionEntity(veh, true, true)
-    TaskWarpPedIntoVehicle(PlayerPedId(), veh, -1)
+        -- Destaque visual: Aura azul para localização do veículo
+        SetEntityDrawOutline(veh, true)
+        SetEntityDrawOutlineColor(50, 50, 255, 255)
 
-    currentDeliveryVehicle = veh
-    TriggerEvent('vp_newspaper:client:notify', _U('vehicleSpawned'), 'success')
-end
+        CreateThread(function()
+            while CurrentDeliveryVehicle and DoesEntityExist(veh) do
+                Wait(500)
+                if IsPedInVehicle(PlayerPedId(), veh, false) then
+                    SetEntityDrawOutline(veh, false)
+                    break
+                end
+            end
+        end)
+    end
+end)
 
 function ReturnDeliveryVehicle()
     local ped = PlayerPedId()
-    local veh = GetVehiclePedIsIn(ped, false)
-    if not veh or veh == 0 then
-        veh = currentDeliveryVehicle
+    if IsPedInAnyVehicle(ped, false) then
+        TaskLeaveVehicle(ped, GetVehiclePedIsIn(ped, false), 0)
+        Wait(1200)
     end
 
-    if veh and DoesEntityExist(veh) then
-        TaskLeaveVehicle(ped, veh, 0)
-        Wait(1500)
-        DeleteEntity(veh)
-        currentDeliveryVehicle = nil
-        TriggerEvent('vp_newspaper:client:notify', _U('vehicleReturned'), 'success')
-    else
-        TriggerEvent('vp_newspaper:client:notify', _U('notInVehicle'), 'error')
-    end
+    TriggerServerEvent('vp_newspaper:server:returnDeliveryVehicle')
 end
+
+RegisterNetEvent('vp_newspaper:client:deliveryVehicleReturned', function()
+    CurrentDeliveryVehicle = nil
+end)
 
 -- ==========================================================
 -- NUI de Gestão da Empresa (Dashboard, Saldo e Funcionários)
@@ -291,3 +357,37 @@ RegisterNUICallback('fireupdown', function(data, cb)
     end
     cb('ok')
 end)
+
+-- ==========================================================
+-- Comandos Diretos de Gestão, Leitura e Produção (NProbleM Flow)
+-- ==========================================================
+
+RegisterCommand('gestaojornal', function()
+    TriggerServerEvent('vp_newspaper:server:requestManagementData')
+end, false)
+
+RegisterCommand('weazelboss', function()
+    TriggerServerEvent('vp_newspaper:server:requestManagementData')
+end, false)
+
+RegisterCommand('lerjornal', function()
+    TriggerServerEvent('vp_newspaper:server:openReader')
+end, false)
+
+RegisterCommand('imprimirjornal', function()
+    local ped = PlayerPedId()
+    if lib.progressBar({
+        duration = 5000,
+        label = _U('printingProgress'),
+        useWhileDead = false,
+        canCancel = true,
+        disable = { car = true, move = true },
+        anim = { dict = 'anim@amb@clubhouse@tutorial@bkr_tut_ig3@', clip = 'machinic_loop_mechandplayer' }
+    }) then
+        TriggerServerEvent('vp_newspaper:server:printNewspapers')
+    end
+end, false)
+
+RegisterCommand('pegapapel', function()
+    TriggerServerEvent('vp_newspaper:server:takePaper')
+end, false)

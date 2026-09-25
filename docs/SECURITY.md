@@ -16,6 +16,8 @@ O resource `vp_newspaper` implementa uma política de segurança militar ("Zero-
 | **XSS via Newspaper NUI (HTML Injection)** | ALTA | Repórter podia injetar `<script>`, `<iframe>` ou eventos `onload` no corpo do jornal, afetando todos os leitores. | **Sanitização de HTML na NUI**: Todas as strings passam por `escapeHtml()` com whitelist de entidades e bloqueio de schemas inseguros (`javascript:`, `data:`). |
 | **Negative Number / NaN Money Glitch** | CRÍTICA | Envio de saques com valores negativos ou decimais malformados para inflar saldo da empresa ou do player. | **Validação e Normalização Numérica**: `math.floor`, checagem de tipo `type(val) == "number"` e rejeição de qualquer valor `<= 0` ou não finito. |
 | **Job Spoofing / Impersonation** | ALTA | Client avisava ao servidor que tinha o job de repórter ou cargo de chefe. | **Autoridade Estrita no Servidor**: Verificação do cargo e grade diretamente via `Player.PlayerData.job.name` e `Player.PlayerData.job.grade.level` no momento exato do processamento. |
+| **DJ Desk Unauthorized Queue Injection** | ALTA | Qualquer jogador podia tentar injetar músicas e URLs maliciosas na rádio global. | **Autorização Server-Side**: Checagem rigorosa de cargo (`djMinGrade`), sanitização de tags HTML no título e comprimento da URL (10 a 500 chars). |
+| **Vehicle Sound Attachment Spoofing** | MÉDIA | Injetor forçava criação de som em veículos de outros jogadores a distância. | **Verificação de Proximidade e Entidade**: Validação de distância física ($\le 6.0\text{m}$) e autoridade do servidor sobre a StateBag veicular. |
 | **Serial Number Duplication / Spoofing** | MÉDIA | Jornais eram gerados sem identidade ou com números sequenciais previsíveis. | **Non-Authoritative Tracking Identifier (UUIDv4)**: Cada exemplar impresso possui serial único para rastreabilidade forense e anti-dupe (`vp_newspaper_copies`). O serial **não é segredo nem atua como autorização/credencial**; o servidor valida estritamente `source`, `citizenid` e estado. |
 
 ---
@@ -44,6 +46,8 @@ Qualquer tentativa de acionamento fora das coordenadas registradas no `Config` r
 | **Estação de Redação (Editor)** | **2.0 metros** | `Config.Editor.location` |
 | **Cofre e Gestão (Company Vault)** | **2.0 metros** | `Config.Company.location` |
 | **Garagem de Veículos (Spawn/Store)** | **3.5m / 4.5m** | `Config.Garage.location` / `Config.Garage.spawnLocation` |
+| **Acoplamento de Som em Veículo** | **6.0 metros** | Coordenadas do veículo alvo (`GetEntityCoords(veh)`). |
+| **Recolhimento de Caixa de Som** | **4.0 metros** | Coordenadas da caixa registrada (`ActiveGroundSpeakers`). |
 
 ---
 

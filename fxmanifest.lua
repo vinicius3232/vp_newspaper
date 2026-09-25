@@ -13,6 +13,11 @@ files {
     'web/index.html',
     'web/script.js',
     'web/styles.css',
+    'web/poster_dui.html',
+    'web/newsroom_live.html',
+    'web/radio_player.html',
+    'web/radio_audio.js',
+    'web/*.js',
     'web/*.png',
     'web/swap.ogg',
     'images/*.png',
@@ -29,6 +34,13 @@ client_scripts {
     'client/newspaper.lua',
     'client/editor.lua',
     'client/boxes.lua',
+    'client/posters.lua',
+    'client/media.lua',
+    'client/radio.lua',
+    'client/speakers_attach.lua',
+    'client/broadcast_van.lua',
+    'client/newsroom_display.lua',
+    'client/admin.lua',
     'client/main.lua',
 }
 
@@ -43,6 +55,13 @@ server_scripts {
     'server/company.lua',
     'server/boxes.lua',
     'server/printing.lua',
+    'server/posters.lua',
+    'server/media.lua',
+    'server/radio.lua',
+    'server/speakers_attach.lua',
+    'server/broadcast_van.lua',
+    'server/admin.lua',
+    'server/modules/oxmysql_smoke.lua',
 }
 
 this_is_a_map 'yes'

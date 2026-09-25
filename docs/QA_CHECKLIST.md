@@ -6,8 +6,9 @@ Este documento contém o status das verificações automatizadas e as instruçõ
 
 ## 1. Resumo dos Portões de Qualidade
 
-* **Validação de Sintaxe Lua 5.4 (`luac.exe -p`):** `[PASS]` (16/16 arquivos validados com código de saída 0).
-* **Testes Adversariais Automatizados (`tests/test_harness.js`):** `[PASS]` (20/20 cenários aprovados).
+* **Validação de Sintaxe Lua 5.4 (`luac.exe -p`):** `[PASS]` (100% dos arquivos Lua validados com código de saída 0).
+* **Testes Adversariais Automatizados (`tests/test_harness.js`):** `[PASS]` (97/97 cenários aprovados, 0 falhas).
+* **Gate de Integração MariaDB 12 (`mariadb_integration_gate.py`):** `[PASS]` (10/10 testes aprovados).
 * **Varredura Anti-XSS e Higienização de NUI:** `[PASS]` (Zero ofuscação, `escapeHtml` e isolamento estrito).
 * **Integridade Estrutural SQL (Migrations & Constraints):** `[PASS]` (Tabelas idempotentes com `CHECK` constraints).
 * **Validação Física In-Game (FiveM Runtime):** `[PENDING_OPERATOR]` (Requer execução manual no cliente FiveM).
@@ -41,6 +42,18 @@ Este documento contém o status das verificações automatizadas e as instruçõ
 | **QA-21** | Animação e progresso na coleta de papel | In-Game / Física | `[PENDING_OPERATOR]` | Ver Roteiro 2 abaixo. |
 | **QA-22** | Abertura do NUI do Editor e Leitor de Jornal | In-Game / UI | `[PENDING_OPERATOR]` | Ver Roteiro 3 abaixo. |
 | **QA-23** | Spawning e armazenamento do veículo da empresa | In-Game / Garagem | `[PENDING_OPERATOR]` | Ver Roteiro 4 abaixo. |
+| **QA-24** | Gestão financeira e saque do cofre com Ledger | In-Game / Economia | `[PENDING_OPERATOR]` | Ver Roteiro 5 abaixo. |
+| **QA-25** | Transmissão de rádio global via `/weazeldj` | Rádio / DJ | `[PENDING_OPERATOR]` | Ver Roteiro 6 abaixo. |
+| **QA-26** | Playback de Playlist do YouTube sem cortes | Áudio / NUI | `[PASS]` | Transição de faixas gerenciada via IFrame API `loadPlaylist`. |
+| **QA-27** | Sintonizador veicular no painel (`/weazelradio`) | Gameplay / Carro | `[PENDING_OPERATOR]` | Ver Roteiro 6 abaixo. |
+| **QA-28** | Escuta individual com fones de ouvido (`headphones`)| Item / Áudio | `[PENDING_OPERATOR]` | Volume pessoal 100% sem perda de distância. |
+| **QA-29** | Carregar boombox no ombro (`radio_portable`) | Física / Animação | `[PENDING_OPERATOR]` | Animação `box_carry`, statebag `weazelCarryingRadio`. |
+| **QA-30** | Áudio 3D multi-player (ouvir rádio de outro jogador)| Rede / Áudio 3D | `[PENDING_OPERATOR]` | Ver Roteiro 7 abaixo. Atenuação quadrática de 0m a 25m. |
+| **QA-31** | Posicionar e recolher caixa no chão (`/pegarcaixa`) | Entidade / ox_target| `[PENDING_OPERATOR]` | `prop_boombox_01`, registro server-side e devolução do item. |
+| **QA-32** | Instalar e desinstalar som veicular (Trunk/Roof/Bed)| Acoplamento | `[PENDING_OPERATOR]` | Ver Roteiro 8 abaixo. Proximidade <= 6m, StateBag. |
+| **QA-33** | Presets do Equalizador Biquad (Bass, Broadcast, etc.)| Web Audio API | `[PASS]` | 5 nós biquad reconfigurados instantaneamente em cascata. |
+| **QA-34** | Modo Streamer Anti-DMCA (`/modostreamer`) | Proteção / KVP | `[PASS]` | Silenciamento seletivo de streamers com persistência local. |
+| **QA-35** | Atenuação de Plantão Urgente (Breaking News) | Áudio / Evento | `[PASS]` | Vinheta urgente atenua rádio em 85% com restauração suave. |
 
 ---
 
@@ -89,3 +102,42 @@ Este documento contém o status das verificações automatizadas e as instruçõ
 3. Efetue um saque de teste (ex: $100).
 4. Verifique se o dinheiro é creditado ao personagem e o saldo da empresa é deduzido.
 5. Verifique no banco de dados se a tabela `vp_newspaper_ledger` registrou a transação com seu `citizenid` e valores exatos.
+
+### Roteiro 6: Weazel Radio 98.5 FM & Playlists do YouTube
+1. Com cargo de repórter ou admin, digite `/weazeldj`.
+2. Selecione **"Adicionar Música ou Playlist"**:
+   - Insira um link individual do YouTube ou uma Playlist (`https://www.youtube.com/playlist?list=...`).
+   - Confirme a inserção na fila e veja o status mudar para `AO VIVO`.
+3. Entre em qualquer veículo civil e digite `/weazelradio`:
+   - Ative a opção "Sintonizar no Painel do Carro".
+   - Verifique o som da rádio tocando nitidamente pelos alto-falantes do carro.
+4. Abra o menu do Equalizador e alterne entre os presets (`Bass Boost`, `Broadcast FM`, `Club`):
+   - Perceba a mudança imediata na resposta de frequências graves e agudas.
+5. Use o item `headphones`:
+   - O áudio passa a tocar diretamente no seu ouvido independente de estar dentro ou fora do carro.
+
+### Roteiro 7: Caixa de Som Portátil & Áudio 3D Multi-Player
+1. Dê a si mesmo o item `radio_portable`: `/giveitem me radio_portable 1`.
+2. Use o item pelo inventário:
+   - Selecione **"Carregar no Braço / Ombro"**: o ped assume a animação de carregar e a caixa fica acoplada ao corpo.
+   - Caminhe pelo mapa: o som acompanha seus passos em tempo real.
+3. Chame um segundo jogador (Jogador B):
+   - Conforme o Jogador B se aproxima de você (a menos de 25 metros), ele ouve a música aumentando gradualmente.
+   - Ao se afastar, o áudio diminui até silenciar suavemente.
+4. Pressione a tecla `[E]`:
+   - A caixa é posicionada no chão. O Jogador B continua ouvindo a música emanando do ponto exato no chão.
+5. O Jogador B digite `/pegarcaixa` ou mire na caixa com o `ox_target` ("Recolher Caixa de Som"):
+   - A caixa é removida do chão e transferida para o inventário do Jogador B.
+
+### Roteiro 8: Sistema de Som Veicular (Rahe Engineering)
+1. Pare com um carro e desça dele tendo uma `radio_portable` no inventário.
+2. Mire no veículo com o `ox_target` e escolha "Sistema de Som Veicular".
+3. Selecione "Instalar no Porta-Malas / Traseira":
+   - A barra de progresso da instalação mecânica é executada.
+   - O prop da caixa surge perfeitamente acoplado à traseira do carro.
+4. Ligue a rádio do carro com `/weazelradio`.
+5. Saia do carro e caminhe até 30 metros de distância:
+   - O som automotivo potente é audível por todos que passarem pela rua ao redor do veículo.
+6. Mire novamente no carro com `ox_target` e escolha "Desinstalar Caixa de Som":
+   - O equipamento é desinstalado e a caixa volta para a sua mochila.
+

@@ -36,6 +36,89 @@ RegisterNetEvent('vp_newspaper:server:requestBoxes', function()
 end)
 
 -- ==========================================================
+-- Criação de Nova Banca de Jornal (Modo Interativo / Admin)
+-- ==========================================================
+
+RegisterNetEvent('vp_newspaper:server:createBox', function(coords, heading)
+    local src = source
+    local player = GetPlayer(src)
+    if not player then return end
+
+    -- 1. Permissão Administrativa
+    local isAllowed = false
+    if IsPlayerAceAllowed(tostring(src), 'command') or IsPlayerAceAllowed(tostring(src), 'vp_newspaper.createbox') then
+        isAllowed = true
+    elseif player.PlayerData and player.PlayerData.permission then
+        local pGroup = player.PlayerData.permission
+        for _, allowed in ipairs(Config.General.creatingBoxes.allowedGroups or { 'admin', 'god' }) do
+            if pGroup == allowed then
+                isAllowed = true
+                break
+            end
+        end
+    end
+
+    if not isAllowed then
+        NotifyPlayer(src, 'Você não possui permissão para instalar bancas de jornal.', 'error')
+        return
+    end
+
+    -- 2. Rate Limit (Tier: CRITICAL)
+    if not Security.CheckRateLimit(src, 'create_newspaper_box', 'CRITICAL') then
+        NotifyPlayer(src, 'Aguarde alguns segundos antes de criar outra banca.', 'error')
+        return
+    end
+
+    -- 3. Sanitização e Bounds Checking
+    if type(coords) ~= 'table' or not coords.x or not coords.y or not coords.z then
+        NotifyPlayer(src, 'Coordenadas inválidas para instalação da banca.', 'error')
+        return
+    end
+
+    coords.x = tonumber(coords.x)
+    coords.y = tonumber(coords.y)
+    coords.z = tonumber(coords.z)
+    heading = tonumber(heading) or 0.0
+
+    if not coords.x or not coords.y or not coords.z then return end
+
+    -- Checa proximidade do ped que está executando a ação (máx 15 metros)
+    local ped = GetPlayerPed(src)
+    if ped and DoesEntityExist(ped) then
+        local pCoords = GetEntityCoords(ped)
+        local dist = #(pCoords - vector3(coords.x, coords.y, coords.z))
+        if dist > 15.0 then
+            NotifyPlayer(src, 'Local de instalação muito distante da sua posição atual.', 'error')
+            return
+        end
+    end
+
+    -- 4. Persistência no Banco de Dados
+    local coordsJson = json.encode({ x = coords.x, y = coords.y, z = coords.z })
+    local insertId = MySQL.insert.await([[
+        INSERT INTO `newspaper_boxes` (`coords`, `heading`, `stock`, `max_stock`, `version`)
+        VALUES (?, ?, 15, 20, 1)
+    ]], { coordsJson, heading })
+
+    if insertId and insertId > 0 then
+        Boxes[insertId] = {
+            id = insertId,
+            coords = vector3(coords.x, coords.y, coords.z),
+            heading = heading,
+            stock = 15,
+            maxStock = 20,
+            version = 1
+        }
+
+        TriggerClientEvent('vp_newspaper:client:syncBoxes', -1, Boxes)
+        NotifyPlayer(src, 'Banca de jornal instalada e sincronizada com sucesso!', 'success')
+        SendDiscordLog('Nova Banca de Jornal Criada', ('O administrador **%s** criou a banca #%d em `%.2f, %.2f, %.2f`.'):format(GetPlayerName(src) or 'Admin', insertId, coords.x, coords.y, coords.z), 65280)
+    else
+        NotifyPlayer(src, 'Falha ao salvar a banca no banco de dados.', 'error')
+    end
+end)
+
+-- ==========================================================
 -- Compra de Jornal — Transação Idempotente, Atômica & Anti-Dupe
 -- ==========================================================
 

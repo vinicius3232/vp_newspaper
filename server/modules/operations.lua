@@ -5,8 +5,8 @@
 Operations = {}
 
 local VALID_TRANSITIONS = {
-    PENDING = { PROCESSING = true, ABORTED = true },
-    PROCESSING = { COMMITTED = true, COMPENSATING = true, FAILED = true, ABORTED = true },
+    PENDING = { PROCESSING = true, ABORTED = true, FAILED = true },
+    PROCESSING = { COMMITTED = true, COMPENSATING = true, COMPENSATED = true, FAILED = true, ABORTED = true },
     COMPENSATING = { COMPENSATED = true, MANUAL_REVIEW = true, FAILED = true },
     COMMITTED = {},
     COMPENSATED = {},

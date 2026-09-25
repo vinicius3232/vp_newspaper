@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weazel News - Live Newsroom Display</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background-color: #0b0e14;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            overflow: hidden;
+            width: 1024px;
+            height: 576px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            border: 4px solid #1a2233;
+        }
+
+        /* Top Header */
+        .header {
+            background: linear-gradient(90deg, #b91c1c 0%, #1e293b 100%);
+            padding: 14px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #ef4444;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .header-logo {
+            font-size: 26px;
+            font-weight: 900;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #ffffff;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+        }
+
+        .header-badge {
+            background-color: #000000;
+            color: #22c55e;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid #16a34a;
+        }
+
+        .header-badge.breaking {
+            color: #ffffff;
+            background-color: #dc2626;
+            border-color: #ef4444;
+            animation: pulse 1s infinite alternate;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.9; }
+            100% { transform: scale(1.05); opacity: 1; }
+        }
+
+        .header-time {
+            font-size: 20px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            color: #f1f5f9;
+        }
+
+        /* Main Content */
+        .content {
+            padding: 28px 36px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            background: radial-gradient(circle at 50% 30%, #161e2e 0%, #0b0e14 100%);
+            position: relative;
+        }
+
+        .meta-tag {
+            color: #ef4444;
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .title {
+            font-size: 38px;
+            font-weight: 800;
+            line-height: 1.25;
+            color: #f8fafc;
+            margin-bottom: 16px;
+            text-shadow: 0 4px 12px rgba(0, 0, 0, 0.7);
+            max-height: 145px;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+        }
+
+        .subtitle {
+            font-size: 18px;
+            color: #94a3b8;
+            line-height: 1.4;
+            max-height: 52px;
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+
+        /* Stats Cards */
+        .stats-bar {
+            display: flex;
+            gap: 20px;
+        }
+
+        .stat-card {
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 10px 18px;
+            border-radius: 6px;
+            flex: 1;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-val {
+            font-size: 20px;
+            color: #38bdf8;
+            font-weight: 800;
+            margin-top: 4px;
+        }
+
+        /* Footer Ticker */
+        .ticker {
+            background-color: #0f172a;
+            border-top: 2px solid #ef4444;
+            display: flex;
+            height: 44px;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .ticker-label {
+            background-color: #b91c1c;
+            color: #ffffff;
+            font-weight: 900;
+            font-size: 13px;
+            padding: 0 20px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            white-space: nowrap;
+            z-index: 2;
+        }
+
+        .ticker-wrap {
+            flex: 1;
+            overflow: hidden;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+        }
+
+        .ticker-text {
+            display: inline-block;
+            padding-left: 100%;
+            animation: ticker 25s linear infinite;
+            font-size: 16px;
+            font-weight: 600;
+            color: #e2e8f0;
+            letter-spacing: 0.5px;
+        }
+
+        @keyframes ticker {
+            0% { transform: translate3d(0, 0, 0); }
+            100% { transform: translate3d(-100%, 0, 0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-brand">
+            <span class="header-logo">WEAZEL NEWS</span>
+            <div id="statusBadge" class="header-badge">● TRANSMISSÃO AO VIVO</div>
+        </div>
+        <div id="clockDisplay" class="header-time">12:00:00</div>
+    </div>
+
+    <div class="content">
+        <div id="categoryLabel" class="meta-tag">EDIÇÃO PRINCIPAL DE LOS SANTOS</div>
+        <h1 id="headlineText" class="title">WEAZEL NEWS: A VERDADE EM TEMPO REAL PARA TODA SAN ANDREAS</h1>
+        <p id="subheadlineText" class="subtitle">Acompanhe as últimas publicações, reportagens de campo e investigações exclusivas da redação.</p>
+        
+        <div class="stats-bar">
+            <div class="stat-card">
+                <div class="stat-label">Frequência Central</div>
+                <div class="stat-val">98.5 FM</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Bancas em Operação</div>
+                <div id="boxesCount" class="stat-val">5 Ativas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Plantão Urgente</div>
+                <div id="breakingCount" class="stat-val">Monitorando</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ticker">
+        <div class="ticker-label">URGENTE</div>
+        <div class="ticker-wrap">
+            <div id="tickerContent" class="ticker-text">
+                +++ WEAZEL NEWS 98.5 FM NO AR +++ COBERTURA COMPLETA DE SAN ANDREAS +++ INFORMAÇÕES DIRETAS DA REDAÇÃO CENTRAL +++
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateClock() {
+            const now = new Date();
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(now.getMinutes()).padStart(2, '0');
+            const s = String(now.getSeconds()).padStart(2, '0');
+            const clockEl = document.getElementById('clockDisplay');
+            if (clockEl) clockEl.textContent = `${h}:${m}:${s}`;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        function setDisplayData(data) {
+            if (!data) return;
+            if (data.title) {
+                document.getElementById('headlineText').textContent = data.title;
+            }
+            if (data.subtitle) {
+                document.getElementById('subheadlineText').textContent = data.subtitle;
+            }
+            if (data.category) {
+                document.getElementById('categoryLabel').textContent = data.category.toUpperCase();
+            }
+            if (data.boxesCount !== undefined) {
+                document.getElementById('boxesCount').textContent = `${data.boxesCount} Ativas`;
+            }
+            if (data.tickerText) {
+                document.getElementById('tickerContent').textContent = data.tickerText;
+            }
+            
+            const badge = document.getElementById('statusBadge');
+            const breakingCount = document.getElementById('breakingCount');
+            if (data.isBreaking) {
+                badge.className = 'header-badge breaking';
+                badge.textContent = '🔴 AO VIVO - PLANTÃO';
+                if (breakingCount) breakingCount.textContent = 'EM ANDAMENTO';
+            } else {
+                badge.className = 'header-badge';
+                badge.textContent = '● TRANSMISSÃO AO VIVO';
+                if (breakingCount) breakingCount.textContent = 'Normal';
+            }
+        }
+
+        // Suporte para chamadas via FiveM DUI SendDuiMessage
+        window.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'UPDATE_NEWSROOM') {
+                setDisplayData(event.data.payload);
+            }
+        });
+    </script>
+</body>
+</html>

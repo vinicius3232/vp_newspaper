@@ -7,11 +7,12 @@ O `vp_newspaper` é um resource FiveM de jornalismo impresso e distribuição f�
 * **FiveM FXServer:** Artifacts recomendados 10000+ (OneSync Infinity ativado).
 * **Ambiente de Execução:** Lua 5.4 nativo com isolamento rigoroso de escopo (`local` obrigatório).
 * **Framework:** Qbox / QBCore (`exports['qbx_core']` e compatibilidade `QBCore.Functions`).
-* **Utilitários e UI:** `ox_lib` (points, callbacks, notifications, progressBar, cache).
-* **Interação Física:** `ox_target` (interações nos modelos de stands de jornal, pontos de impressão, editor e cofre).
+* **Utilitários e UI:** `ox_lib` (points, callbacks, notifications, progressBar, cache, context menus, input dialogs).
+* **Interação Física:** `ox_target` (interações nos modelos de stands de jornal, pontos de impressão, editor, cofre, veículos e caixas de som no chão).
 * **Inventário:** `ox_inventory` (manipulação atômica de slots, metadata de seriais únicos e persistência de itens).
 * **Persistência Relacional:** `oxmysql` (MariaDB/MySQL) com transações ACID, versionamento otimista e constraints rígidas.
-* **Frontend:** NUI (HTML5, Vanilla JS + jQuery UI nativo sem ofuscação, CSS3 isolado).
+* **Frontend & Áudio CEF:** NUI (HTML5, Vanilla JS, Web Audio API com 5-band Biquad Equalizer, YouTube IFrame API com suporte nativo a Playlists).
+* **Sincronização 3D:** StateBags replicadas (`weazelVehicleSpeaker`, `weazelCarryingRadio`) e registro server-side de alto-falantes (`ActiveGroundSpeakers`).
 
 ---
 
@@ -21,7 +22,7 @@ O `vp_newspaper` é um resource FiveM de jornalismo impresso e distribuição f�
 [Server Boot / Resource Start]
        │
        ▼
-1. Execução de Migrations SQL Idempotentes (001 -> 002 -> 003)
+1. Execução de Migrations SQL Idempotentes (001 -> 002 -> 003 -> 004 -> 005)
        │
        ▼
 2. FSM Crash Recovery (RecoverOnBoot: reconcilia operações 'PROCESSING' / 'PENDING')
@@ -186,3 +187,45 @@ sequenceDiagram
         Srv-->>Ed1: Salvo com sucesso!
     end
 ```
+
+---
+
+### 3.5. Transmissão da Weazel Radio 98.5 FM, Som 3D & Playlists
+```mermaid
+sequenceDiagram
+    autonumber
+    actor DJ as DJ / Repórter
+    actor Listener as Ouvinte / Ped Próximo
+    participant Srv as Server (radio.lua)
+    participant ClientDJ as Client DJ (radio.lua)
+    participant ClientL as Client Ouvinte (radio.lua)
+    participant NUI as NUI CEF (radio_audio.js)
+
+    DJ->>ClientDJ: Executa /weazeldj -> Adicionar Música ou Playlist
+    ClientDJ->>Srv: TriggerServerEvent('vp_newspaper:server:addRadioTrack', url, title)
+    Srv->>Srv: Valida Permissão (Grade >= 1 ou Admin) e Sanitiza URL
+    Srv->>Srv: Insere na StationState.queue (detecta se é Playlist ou Faixa)
+    Srv->>ClientL: TriggerClientEvent('vp_newspaper:client:syncRadioState', broadcastData)
+
+    loop Adaptive Ticking Loop (a cada 250ms a 1200ms)
+        ClientL->>ClientL: UpdateRadioPlayback()
+        Note over ClientL: Checa Fones -> Caixa Carregada -> Rádio do Carro -> Fontes 3D
+        alt Fone de Ouvido Ligado ou Carregando Caixa
+            ClientL->>NUI: SendNUIMessage({action='playRadio', volume=userVolume})
+        else Próximo a Caixa no Chão ou Carro com Som
+            ClientL->>ClientL: Calcula Distância Euclidiana 3D com Queda Quadrática
+            ClientL->>NUI: SendNUIMessage({action='setVolume', volume=calculatedVolume})
+        else Fora de Alcance (> 25m-30m)
+            ClientL->>NUI: SendNUIMessage({action='stopRadio'})
+        end
+    end
+
+    Note over NUI: Web Audio API aplica 5-Band Biquad EQ (Broadcast, Bass, etc.)
+    alt Playlist do YouTube Finaliza Faixa
+        NUI->>NUI: ytPlayer avança automaticamente para próxima música da lista
+    else Fim da Programação
+        NUI->>Srv: Callback 'radioTrackEnded'
+        Srv->>Srv: Avança Fila ou Carrega Faixa Padrão
+    end
+```
+

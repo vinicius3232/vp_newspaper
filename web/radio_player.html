@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Weazel Radio Audio Player</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 0;
+            height: 0;
+            overflow: hidden;
+            background: transparent;
+        }
+        #youtube-player-container {
+            display: none;
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
+            width: 1px;
+            height: 1px;
+        }
+    </style>
+    <!-- YouTube IFrame API -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+</head>
+<body>
+    <div id="youtube-player-container">
+        <div id="ytplayer"></div>
+    </div>
+    <audio id="html5-player" preload="auto"></audio>
+
+    <script src="radio_audio.js"></script>
+</body>
+</html>

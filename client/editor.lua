@@ -64,6 +64,18 @@ RegisterNetEvent('clen:changePage', function(pageContent, newRevision)
     })
 end)
 
+-- Sincronização atômica de revisão OCC enviada pelo servidor
+RegisterNetEvent('clen:updateRevision', function(pageNum, newRevision)
+    if newRevision then
+        currentRevision = tonumber(newRevision) or (currentRevision + 1)
+        SendNUIMessage({
+            type = 'updateRevision',
+            revision = currentRevision,
+            page = pageNum
+        })
+    end
+end)
+
 -- ==========================================================
 -- NUI Callbacks do Editor Visual com OCC e Heartbeat
 -- ==========================================================
@@ -115,3 +127,35 @@ RegisterNUICallback('closeEditor', function(data, cb)
     TriggerServerEvent('nproblem_newspaper_isEditorActive2')
     cb('ok')
 end)
+
+-- ==========================================================
+-- Comandos Rápidos de Acesso à Redação e Editor de Jornal
+-- ==========================================================
+
+local function RequestOpenEditor()
+    print('^2[vp_newspaper] Comando de redação acionado. Solicitando abertura ao servidor...^7')
+    TriggerServerEvent('nproblem_newspaper_back')
+end
+
+RegisterCommand('redacao', RequestOpenEditor, false)
+RegisterCommand('editorjornal', RequestOpenEditor, false)
+RegisterCommand('weazeleditor', RequestOpenEditor, false)
+RegisterCommand('editjornal', RequestOpenEditor, false)
+
+RegisterCommand('fecharjornal', function()
+    SetNuiFocus(false, false)
+    isEditorOpen = false
+    currentSessionId = nil
+    ClearPedTasks(PlayerPedId())
+    TriggerServerEvent('nproblem_newspaper_isEditorActive2')
+    TriggerEvent('vp_newspaper:client:notify', 'Interface fechada com sucesso.', 'info')
+end, false)
+
+RegisterCommand('destravarjornal', function()
+    SetNuiFocus(false, false)
+    isEditorOpen = false
+    currentSessionId = nil
+    ClearPedTasks(PlayerPedId())
+    TriggerServerEvent('nproblem_newspaper_isEditorActive2')
+    TriggerEvent('vp_newspaper:client:notify', 'Interface destravada com sucesso.', 'info')
+end, false)
