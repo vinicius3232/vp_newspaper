@@ -116,3 +116,24 @@ lib.callback.register('vp_newspaper:server:useLeadInArticle', function(source, l
     local affected = MySQL.update.await('UPDATE vp_leads SET used = 1 WHERE lead_id = ? AND citizenid = ?', { leadId, citizenid })
     return affected and affected > 0
 end)
+
+-- ============================================================================
+-- Event: Vincular Pauta a uma Edição Impressa com Bonificação
+-- ============================================================================
+RegisterNetEvent('vp_newspaper:server:attachLeadToPage', function(leadId, pageNum)
+    local src = source
+    local player = QBCore.Functions.GetPlayer(src)
+    if not player then return end
+
+    local citizenid = player.PlayerData.citizenid
+    local lead = MySQL.single.await('SELECT * FROM vp_leads WHERE lead_id = ? AND citizenid = ? AND used = 0', { leadId, citizenid })
+    if not lead then
+        TriggerClientEvent('vp_newspaper:client:notify', src, 'Pauta não encontrada ou já utilizada.', 'error')
+        return
+    end
+
+    MySQL.update.await('UPDATE vp_leads SET used = 1 WHERE lead_id = ?', { leadId })
+    player.Functions.AddMoney('cash', 200, 'lead-investigation-bonus')
+    TriggerClientEvent('vp_newspaper:client:notify', src, ('Pauta investigativa "%s" vinculada à página %d! Bônus de $200 recebido.'):format(lead.headline_seed, pageNum or 1), 'success')
+end)
+

@@ -229,3 +229,55 @@ lib.callback.register('vp_newspaper:server:getPlayerCardShelf', function(source)
     local rows = MySQL.query.await('SELECT card_id, rarity, serial, grade, discovered_at FROM vp_cards_shelf WHERE citizenid = ? ORDER BY grade DESC, discovered_at DESC', { citizenid })
     return rows or {}
 end)
+
+-- ============================================================================
+-- Callback: Venda de Cartas para Colecionadores / Loja Weazel
+-- ============================================================================
+lib.callback.register('vp_newspaper:server:sellCard', function(source, slot)
+    local src = source
+    local player = QBCore.Functions.GetPlayer(src)
+    if not player then return { success = false, message = 'Jogador não encontrado' } end
+
+    local cfg = Config.General.Collectibles
+    local cardItemName = cfg.items.card or 'card'
+
+    local item = exports.ox_inventory:GetSlot(src, slot)
+    if not item or item.name ~= cardItemName or item.count < 1 then
+        return { success = false, message = 'Carta inválida no inventário' }
+    end
+
+    local meta = item.metadata or {}
+    local rarity = meta.rarity or 'basic'
+
+    -- Base de Preço por Raridade
+    local basePrice = 25
+    if rarity == 'rare' then
+        basePrice = 120
+    elseif rarity == 'legendary' then
+        basePrice = 600
+    end
+
+    -- Bônus de Nota PSA
+    local multiplier = 1.0
+    if meta.graded and meta.grade and meta.grade >= 7 then
+        multiplier = 1.0 + (meta.grade - 6) * 0.25
+    end
+
+    local finalPayout = math.floor(basePrice * multiplier)
+
+    -- Remoção Fail-Closed antes do pagamento
+    local removed = exports.ox_inventory:RemoveItem(src, cardItemName, 1, nil, slot)
+    if not removed then
+        return { success = false, message = 'Falha ao entregar a carta' }
+    end
+
+    player.Functions.AddMoney('cash', finalPayout, 'sell-trading-card')
+
+    return {
+        success = true,
+        earned = finalPayout,
+        title = meta.title or 'Carta',
+        grade = meta.grade or 0,
+    }
+end)
+

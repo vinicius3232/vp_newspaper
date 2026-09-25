@@ -227,6 +227,113 @@ RegisterCommand('colecao', function()
     lib.showContext('vp_cards_shelf_menu')
 end, false)
 
+-- ============================================================================
+-- Menu: Vender Cartas para Colecionadores (/vendercarta)
+-- ============================================================================
+local function OpenSellCardMenu()
+    local cfg = Config.General.Collectibles
+    local cardItemName = cfg.items.card or 'card'
+    local items = exports.ox_inventory:Search('slots', cardItemName)
+    if not items or #items == 0 then
+        lib.notify({
+            title = 'Venda de Cartas',
+            description = 'Você não possui cartas no inventário para vender.',
+            type = 'inform',
+        })
+        return
+    end
+
+    local options = {}
+    for _, c in ipairs(items) do
+        local meta = c.metadata or {}
+        local rarity = meta.rarity or 'basic'
+        local basePrice = 25
+        if rarity == 'rare' then basePrice = 120 elseif rarity == 'legendary' then basePrice = 600 end
+        local mult = 1.0
+        if meta.graded and meta.grade and meta.grade >= 7 then
+            mult = 1.0 + (meta.grade - 6) * 0.25
+        end
+        local val = math.floor(basePrice * mult)
+
+        local desc = ('Raridade: %s | Valor: $%d'):format(rarity, val)
+        if meta.graded then
+            desc = desc .. (' (⭐ PSA %d/10)'):format(meta.grade)
+        end
+
+        table.insert(options, {
+            title = meta.title or 'Carta Colecionável',
+            description = desc,
+            onSelect = function()
+                local confirm = lib.alertDialog({
+                    header = 'Confirmar Venda de Carta',
+                    content = ('Deseja vender **%s** para o colecionador da Weazel por **$%d** em dinheiro?'):format(meta.title or 'esta carta', val),
+                    centered = true,
+                    cancel = true,
+                })
+                if confirm == 'confirm' then
+                    local res = lib.callback.await('vp_newspaper:server:sellCard', false, c.slot)
+                    if res and res.success then
+                        lib.notify({
+                            title = 'Carta Vendida!',
+                            description = ('Você vendeu **%s** por +**$%d** em dinheiro!'):format(res.title, res.earned),
+                            type = 'success',
+                        })
+                    else
+                        lib.notify({
+                            title = 'Venda de Cartas',
+                            description = (res and res.message) or 'Erro ao vender a carta.',
+                            type = 'error',
+                        })
+                    end
+                end
+            end,
+        })
+    end
+
+    lib.registerContext({
+        id = 'vp_sell_cards_menu',
+        title = '💰 Balcão de Compra de Cartas Weazel',
+        options = options,
+    })
+    lib.showContext('vp_sell_cards_menu')
+end
+
+RegisterCommand('vendercarta', function()
+    OpenSellCardMenu()
+end, false)
+
+-- ============================================================================
+-- Leitor de Revistas / Quadrinhos Colecionáveis (Comics)
+-- ============================================================================
+local function ReadComicBook(comicId)
+    local cfg = Config.General.Collectibles.comics
+    local comic = cfg[comicId or 'comic_book_1'] or cfg.comic_book_1
+    if not comic then return end
+
+    local currentPage = 1
+    local total = comic.totalPages or 4
+
+    local function ShowPage(page)
+        local content = ('**Edição:** %s\n**Página:** `%d de %d`\n\n_Folheando páginas ilustradas da edição comemorativa Weazel Comics._'):format(comic.title, page, total)
+        local alert = lib.alertDialog({
+            header = ('📖 %s'):format(comic.title),
+            content = content,
+            centered = true,
+            cancel = (page > 1 or page < total),
+        })
+
+        if alert == 'confirm' and page < total then
+            PlaySoundFrontend(-1, 'NAV_LEFT_RIGHT', 'HUD_MINI_GAME_SOUNDSET', true)
+            ShowPage(page + 1)
+        elseif alert == 'cancel' and page > 1 then
+            PlaySoundFrontend(-1, 'NAV_LEFT_RIGHT', 'HUD_MINI_GAME_SOUNDSET', true)
+            ShowPage(page - 1)
+        end
+    end
+
+    ShowPage(currentPage)
+end
+
 -- Exports usáveis integrados ao ox_inventory
 exports('useBoosterPack', function(data, slot)
     OpenBoosterPack(slot or data.slot)
@@ -239,3 +346,9 @@ end)
 exports('usePsaCase', function(data, slot)
     StartPsaGrading(slot or data.slot)
 end)
+
+exports('useComicBook', function(data)
+    local meta = data.metadata or {}
+    ReadComicBook(meta.issue or 'comic_book_1')
+end)
+

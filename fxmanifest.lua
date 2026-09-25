@@ -19,6 +19,8 @@ files {
     'web/radio_audio.js',
     'web/*.js',
     'web/*.png',
+    'web/cards/*.png',
+    'web/papers/**/*.jpg',
     'web/swap.ogg',
     'images/*.png',
     'sql/migrations/*.sql',
