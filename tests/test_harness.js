@@ -1655,7 +1655,8 @@ it('Booster Engine: Cartas customizadas entram dinamicamente no pool de sorteio 
 
     // 4. Garante que qualquer uma das 3 pode ser sorteada
     const drawn = combinedPool[Math.floor(Math.random() * combinedPool.length)];
-    assert(['card_mayor', 'custom_c1', 'custom_c2'].includes(drawn.id || drawn.card_id), 'Drawn card is from combined pool');
+    const cardIdentifier = drawn.card_id || drawn.id;
+    assert(['card_mayor', 'custom_c1', 'custom_c2'].includes(cardIdentifier), 'Drawn card is from combined pool');
 });
 
 // ─── EXECUTION DISPATCHER ────────────────────────────────────────
